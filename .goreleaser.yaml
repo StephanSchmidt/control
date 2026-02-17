@@ -23,6 +23,7 @@ homebrew_casks:
     repository:
       owner: StephanSchmidt
       name: homebrew-control
+      token: "{{ .Env.HOMEBREW_CONTROL_TOKEN }}"
     homepage: https://github.com/StephanSchmidt/control
     description: Generate SVG diagrams from plain text
 
