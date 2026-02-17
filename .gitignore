@@ -10,13 +10,12 @@ fonts/
 *-debug.json
 debug.json
 
-# Generated files in examples (keep .txt files)
-examples/*.svg
+# Generated files in examples (keep .txt and .svg files)
 examples/*.json
 examples/*.png
 
 # Screenshots
-Screenshots/
+Screenshots
 
 # Claude Code local files
 CLAUDE.md

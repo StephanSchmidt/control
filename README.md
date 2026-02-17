@@ -2,7 +2,7 @@
 
 Generate SVG diagrams from plain text. Define boxes on a grid, connect them with arrows, and get clean vector output.
 
-![Scrum workflow example](examples/scrum.png)
+![Scrum workflow example](examples/scrum.svg)
 
 ## Install
 
