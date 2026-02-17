@@ -23,7 +23,8 @@ func svgHeader(width, height int, font *FontData) string {
 
 	// Add arrowhead marker definition
 	header += `<marker id="arrowhead" markerWidth="12" markerHeight="13" refX="8" refY="5.5" orient="auto" viewBox="-1 -1 14 13"><polyline points="0 0.5, 8 5.5, 0 10.4" fill="none" stroke="#000" stroke-width="1.5" stroke-linejoin="miter"/></marker>` +
-		`</defs>`
+		`</defs>` +
+		fmt.Sprintf(`<rect width="%d" height="%d" fill="#fff"/>`, width, height)
 
 	return header
 }
