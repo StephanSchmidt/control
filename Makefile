@@ -1,11 +1,11 @@
-.PHONY: all build install test test-coverage
+.PHONY: all build install test test-coverage lint check sec upgrade-deps example clean
 
 all: build
 
-build: goimports
+build: go-imports
 	go build -o bin/control .
 
-install: goimports
+install: go-imports
 	go install .
 
 test:
@@ -24,18 +24,20 @@ example: build
 clean:
 	go clean -cache -i
 
-goimports:
-	goimports -w .
+go-imports:
+	go tool goimports -w .
 
 lint:
 	go vet ./...
-	staticcheck ./...
-	golangci-lint run ./...
-	nilaway ./...
+	go tool staticcheck ./...
+	go tool golangci-lint run ./...
+	go tool nilaway ./...
 
 sec:
-	gosec ./...
-	govulncheck ./...
+	go tool gosec ./...
+	go tool govulncheck ./...
+
+check: lint sec test
 
 upgrade-deps:
 	go get -u ./...
