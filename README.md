@@ -2,15 +2,26 @@
 
 Generate SVG diagrams from plain text. Define boxes on a grid, connect them with arrows, and get clean vector output.
 
+Written for the diagrams in my [Theory of Control of Software Engineering](https://www.tabulamag.com/p/introduction-to-theory-of-control), designed to be embedded into [sli.dev](https://sli.dev) markdown presentations.
+
 ![Scrum workflow example](examples/scrum.svg)
 
 ## Install
+
+### Homebrew (macOS/Linux)
+
+```
+brew tap StephanSchmidt/control
+brew install control
+```
+
+### Go
 
 ```
 go install control@latest
 ```
 
-Or build from source:
+### Build from source
 
 ```
 make install
