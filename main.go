@@ -6,43 +6,18 @@ import (
 	"os"
 
 	"github.com/alecthomas/kong"
-	"golang.org/x/sys/unix"
 )
 
-// checkNotRoot ensures the program is not running as root (UID 0)
-func checkNotRoot() error {
-	if os.Getuid() == 0 {
-		return fmt.Errorf("this program must not be run as root (UID=0) for security reasons")
-	}
-	return nil
-}
-
-// dropCapabilities drops all unnecessary Linux capabilities to reduce attack surface
-func dropCapabilities() error {
-	// Drop all bounding capabilities
-	// This limits what the process can do even if it tries to gain privileges
-	for i := 0; i <= unix.CAP_LAST_CAP; i++ {
-		// Attempt to drop each capability from the bounding set
-		// Ignore errors for capabilities we don't have
-		_ = unix.Prctl(unix.PR_CAPBSET_DROP, uintptr(i), 0, 0, 0)
-	}
-
-	// Set no-new-privileges flag to prevent gaining new privileges
-	// This prevents the process from gaining privileges via setuid binaries or similar
-	if err := unix.Prctl(unix.PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0); err != nil {
-		return fmt.Errorf("failed to set no-new-privs: %w", err)
-	}
-
-	return nil
-}
+var version = "dev"
 
 type CLI struct {
-	Diagram     string  `help:"Input diagram file" type:"path" default:"examples/diagram.txt"`
-	Out         string  `help:"Output SVG file" type:"path" default:"examples/diagram.svg"`
-	Stretch     float64 `help:"Horizontal stretch factor (1.0 = normal, 0.8 = 80% width)" default:"1.0"`
-	VerticalGap float64 `help:"Vertical gap between boxes in grid units" default:"0.5"`
-	Font        string  `help:"Custom font file (WOFF2 format) to embed in SVG" type:"path" optional:""`
-	Debug       string  `help:"Output debug information to JSON file" type:"path" optional:""`
+	Version     kong.VersionFlag `help:"Print version and exit"`
+	Diagram     string           `help:"Input diagram file" type:"path" default:"examples/diagram.txt"`
+	Out         string           `help:"Output SVG file" type:"path" default:"examples/diagram.svg"`
+	Stretch     float64          `help:"Horizontal stretch factor (1.0 = normal, 0.8 = 80% width)" default:"1.0"`
+	VerticalGap float64          `help:"Vertical gap between boxes in grid units" default:"0.5"`
+	Font        string           `help:"Custom font file (WOFF2 format) to embed in SVG" type:"path" optional:""`
+	Debug       string           `help:"Output debug information to JSON file" type:"path" optional:""`
 }
 
 func printHelp() {
@@ -220,7 +195,7 @@ func main() {
 	}
 
 	var cli CLI
-	kong.Parse(&cli)
+	kong.Parse(&cli, kong.Vars{"version": version})
 
 	// Security check: prevent running as root
 	if err := checkNotRoot(); err != nil {

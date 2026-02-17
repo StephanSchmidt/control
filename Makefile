@@ -14,7 +14,7 @@ test:
 test-coverage:
 	go test -cover
 
-#open: 
+#open:
 #	xdg-open index.html 2>/dev/null || open index.html 2>/dev/null || start index.html
 
 example: build
@@ -27,24 +27,17 @@ clean:
 goimports:
 	goimports -w .
 
-nilcheck:
-	nilaway -exclude-pkgs sumitos/internal/stats ./...
-
 lint:
 	go vet ./...
 	staticcheck ./...
-	# golangci-lint run ./...
+	golangci-lint run ./...
+	nilaway ./...
 
 sec:
 	gosec ./...
 	govulncheck ./...
 
-.PHONY: loc
-
 upgrade-deps:
 	go get -u ./...
 	go mod tidy
 	gotestsum ./...
-
-loc:
-	loc --exclude ".*\.json|.*\.js"^
