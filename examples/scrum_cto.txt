@@ -1,0 +1,11 @@
+# Comment
+1,1: OKRs
+>+1,+1: Business Initiatives
+  >+1,+1: Backlog Planning
+  >+1,+1: Sprint Planning
+  >+1,+1,1: Daily
+  >+2,+1: Developing, p
+  >+2,-1,1/2: 
+  >0,+1: Developing, p
+  >+2,-1,2: Sprint Review
+9,1: Where is the CTO?, nbb-rt-2t

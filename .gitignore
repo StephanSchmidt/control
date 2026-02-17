@@ -1,0 +1,28 @@
+# Binary output
+bin/
+control
+
+# Font files
+fonts/
+
+# Generated files (globally)
+*.png
+*-debug.json
+debug.json
+
+# Generated files in examples (keep .txt files)
+examples/*.svg
+examples/*.json
+examples/*.png
+
+# Screenshots
+Screenshots/
+
+# Claude Code local files
+CLAUDE.md
+claude_mistakes.md
+arrow-routing-spec.md
+.claude/
+
+# Misc
+index.html
