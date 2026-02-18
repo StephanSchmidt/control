@@ -3,7 +3,7 @@ module control
 go 1.25.3
 
 require (
-	github.com/alecthomas/kong v1.13.0
+	github.com/alecthomas/kong v1.14.0
 	golang.org/x/sys v0.41.0
 )
 
