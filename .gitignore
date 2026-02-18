@@ -23,5 +23,8 @@ claude_mistakes.md
 arrow-routing-spec.md
 .claude/
 
+# Playwright MCP
+.playwright-mcp/
+
 # Misc
 index.html

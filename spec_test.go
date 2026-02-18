@@ -125,7 +125,6 @@ func TestParseDiagramSpec_ValidInput(t *testing.T) {
 1: 1,2: Sprint Planning
 2: 3,2: Daily
 3: 4,1: Developing
----
 1 -> 2
 2 -> 3
 `
@@ -207,7 +206,6 @@ func TestParseDiagramSpec_OnlyBoxes(t *testing.T) {
 
 func TestParseDiagramSpec_OnlyArrows(t *testing.T) {
 	text := `
----
 1 -> 2
 2 -> 3
 `
@@ -229,7 +227,6 @@ func TestParseDiagramSpec_MalformedBox(t *testing.T) {
 1: 1,2: Valid Box
 invalid line
 2: 3,4: Another Valid Box
----
 1 -> 2
 `
 
@@ -244,7 +241,6 @@ func TestParseDiagramSpec_MalformedArrow(t *testing.T) {
 1: 1,2: Box One
 2: 2,2: Box Two
 3: 3,2: Box Three
----
 1 -> 2
 invalid arrow
 2 -> 3
@@ -263,9 +259,7 @@ func TestParseDiagramSpec_WithWhitespace(t *testing.T) {
 
   2: 3,2: Daily
 
----
-
-  1 -> 2
+1 -> 2
 
 `
 
@@ -295,7 +289,6 @@ func TestParseDiagramSpec_ComplexDiagram(t *testing.T) {
 3: 5,2: Decision
 4: 7,3: End
 5: 5,1: Alternative
----
 1 -> 2
 2 -> 3
 3 -> 4
@@ -418,7 +411,6 @@ func TestParseDiagramSpec_AutoArrow_MixedWithManual(t *testing.T) {
 2: >3,2: Daily Standup
 3: 4,1: Developing
 4: 7,4: Sprint Review
----
 1 -> 4
 3 -> 4
 `
@@ -448,7 +440,6 @@ func TestParseDiagramSpec_AutoArrow_AllowDuplicates(t *testing.T) {
 	text := `
 1: 1,2: Sprint Planning
 2: >3,2: Daily Standup
----
 1 -> 2
 `
 
@@ -961,8 +952,7 @@ func TestParseDiagramSpec_Comments_InArrowSection(t *testing.T) {
 	text := `
 1: 1,1: Box A
 2: 3,2: Box B
----
-# Comment in arrow section
+# Comment between boxes and arrows
 1 -> 2
 # Another comment
 `
@@ -1832,7 +1822,6 @@ func TestTouchLeftConnector_MultipleBoxes(t *testing.T) {
 func TestArrowValidation_InvalidFromID(t *testing.T) {
 	input := `1: 1,1: Box 1
 2: 2,1: Box 2
----
 3 -> 2`
 
 	_, err := ParseDiagramSpec(input, nil)
@@ -1849,7 +1838,6 @@ func TestArrowValidation_InvalidFromID(t *testing.T) {
 func TestArrowValidation_InvalidToID(t *testing.T) {
 	input := `1: 1,1: Box 1
 2: 2,1: Box 2
----
 1 -> 5`
 
 	_, err := ParseDiagramSpec(input, nil)
@@ -1866,7 +1854,6 @@ func TestArrowValidation_InvalidToID(t *testing.T) {
 func TestArrowValidation_BothInvalid(t *testing.T) {
 	input := `1: 1,1: Box 1
 2: 2,1: Box 2
----
 10 -> 20`
 
 	_, err := ParseDiagramSpec(input, nil)
@@ -1885,7 +1872,6 @@ func TestArrowValidation_ValidReferences(t *testing.T) {
 	input := `1: 1,1: Box 1
 2: 2,1: Box 2
 3: 3,1: Box 3
----
 1 -> 2
 2 -> 3
 1 -> 3`
@@ -1927,7 +1913,6 @@ func TestArrowValidation_MixedManualAndAutoArrows(t *testing.T) {
 	input := `1: 1,1: Box 1
 2: >2,1: Box 2
 3: 3,1: Box 3
----
 1 -> 3`
 
 	spec, err := ParseDiagramSpec(input, nil)
@@ -2245,7 +2230,6 @@ font: fonts/test.woff2
 ---
 a: 1,1: Box A
 b: 3,1: Box B
----
 a -> b
 `
 
@@ -2821,7 +2805,6 @@ func TestParseDiagramSpec_ArrowFlowPerArrow(t *testing.T) {
 a: 1,1: Box A
 b: 3,2: Box B
 c: 5,1: Box C
----
 a -> b | down
 b -> c
 `
@@ -2849,7 +2832,6 @@ func TestParseDiagramSpec_ArrowFlowPerArrowWithSpaces(t *testing.T) {
 	text := `
 a: 1,1: Box A
 b: 3,2: Box B
----
 a -> b | down
 `
 	spec, err := ParseDiagramSpec(text, nil)
@@ -3026,7 +3008,6 @@ A: 1,1: Outside
 G: 3,3 [
     X: 0,0: Inside
 ]
----
 A -> X
 `
 	spec, err := ParseDiagramSpec(text, nil)
@@ -3074,28 +3055,6 @@ G: 1,1 [
 ]
 `,
 			wantErr: "unexpected ']' outside container",
-		},
-		{
-			name: "separator inside container",
-			input: `
-G: 1,1 [
-    X: 0,0: A
-    ---
-    X -> X
-]
-`,
-			wantErr: "section separator not allowed inside container",
-		},
-		{
-			name: "container in arrow section",
-			input: `
-A: 1,1: Box
----
-G: 2,2 [
-    0,0: Inside
-]
-`,
-			wantErr: "container not allowed in arrow section",
 		},
 	}
 

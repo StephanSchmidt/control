@@ -9,7 +9,6 @@ A: 1,1: Phase 1, g
 B: 3,2: Phase 2, g
 C: 5,3: Phase 3, p
 D: 7,4: Phase 4, lp
----
 A -> B
 B -> C
 C -> D

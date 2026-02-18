@@ -356,7 +356,6 @@ func ParseDiagramSpec(text string, customColors map[string]string) (*DiagramSpec
 		Arrows: []ArrowSpec{},
 	}
 
-	inArrowSection := false
 	lines := strings.Split(text, "\n")
 	var previousBoxID string             // Track previous box for auto-arrows
 	var previousGridX int                // Track previous box GridX for relative coordinates
@@ -396,9 +395,6 @@ func ParseDiagramSpec(text string, customColors map[string]string) (*DiagramSpec
 			if inContainer {
 				return nil, fmt.Errorf("nested containers not supported")
 			}
-			if inArrowSection {
-				return nil, fmt.Errorf("container not allowed in arrow section")
-			}
 			// Strip "[" and trim
 			headerStr := strings.TrimSpace(strings.TrimSuffix(line, "["))
 
@@ -435,15 +431,7 @@ func ParseDiagramSpec(text string, customColors map[string]string) (*DiagramSpec
 			continue
 		}
 
-		if line == "---" {
-			if inContainer {
-				return nil, fmt.Errorf("section separator not allowed inside container")
-			}
-			inArrowSection = true
-			continue
-		}
-
-		// Arrow lines (containing "->") are recognized in any section
+		// Arrow lines (containing "->") are recognized anywhere
 		if strings.Contains(line, "->") {
 			parts := strings.Split(line, "->")
 			if len(parts) == 2 {
@@ -477,269 +465,267 @@ func ParseDiagramSpec(text string, customColors map[string]string) (*DiagramSpec
 			}
 		}
 
-		if !inArrowSection {
-			// Check for group definition line: @GroupName: Label
-			if strings.HasPrefix(line, "@") {
-				groupLine := line[1:] // Strip "@"
-				groupParts := strings.SplitN(groupLine, ":", 2)
-				groupName := strings.TrimSpace(groupParts[0])
-				groupLabel := groupName // Default label is the group name
-				if len(groupParts) == 2 {
-					groupLabel = strings.TrimSpace(groupParts[1])
-				}
-				groupDefs[groupName] = groupLabel
+		// Check for group definition line: @GroupName: Label
+		if strings.HasPrefix(line, "@") {
+			groupLine := line[1:] // Strip "@"
+			groupParts := strings.SplitN(groupLine, ":", 2)
+			if len(groupParts) == 0 {
 				continue
 			}
-
-			// Parse box: "dev: 1,2: Sprint Planning" or ">3,2: Daily Standup" (no ID)
-			parts := strings.SplitN(line, ":", 3)
-
-			var id string
-			var coordsAndLabelParts []string
-
-			if len(parts) == 3 {
-				// Format: "ID: coords: label"
-				id = strings.TrimSpace(parts[0])
-				// Validate ID: alphanumeric + underscore + hyphen only
-				if id == "" {
-					return nil, fmt.Errorf("invalid box definition: empty ID in line '%s'", line)
-				}
-				for _, ch := range id {
-					if (ch < 'a' || ch > 'z') && (ch < 'A' || ch > 'Z') &&
-						(ch < '0' || ch > '9') && ch != '_' && ch != '-' {
-						return nil, fmt.Errorf("invalid ID '%s': must contain only alphanumeric characters, underscore, or hyphen", id)
-					}
-				}
-				coordsAndLabelParts = parts[1:3]
-			} else if len(parts) == 2 {
-				// Format: "coords: label" (no ID)
-				id = "" // Will be assigned internal ID if needed
-				coordsAndLabelParts = parts
-			} else {
-				return nil, fmt.Errorf("invalid box definition: '%s'", line)
+			groupName := strings.TrimSpace(groupParts[0])
+			groupLabel := groupName // Default label is the group name
+			if len(groupParts) == 2 {
+				groupLabel = strings.TrimSpace(groupParts[1])
 			}
-
-			// Generate internal ID for boxes without explicit IDs
-			if id == "" {
-				id = fmt.Sprintf("_box_%d", internalIDCounter)
-				internalIDCounter++
-			}
-
-			// Check for auto-arrow prefix ">" or touch-left prefix "|"
-			coordsStr := strings.TrimSpace(coordsAndLabelParts[0])
-			autoArrow := strings.HasPrefix(coordsStr, ">")
-			touchLeft := strings.HasPrefix(coordsStr, "|")
-
-			if autoArrow {
-				// Check if this is the first box
-				if previousBoxID == "" {
-					return nil, fmt.Errorf("first box (label '%s') cannot have auto-arrow prefix '>'", id)
-				}
-				// Strip the ">" prefix
-				coordsStr = strings.TrimPrefix(coordsStr, ">")
-			} else if touchLeft {
-				// Check if this is the first box
-				if previousBoxID == "" {
-					idStr := id
-					if idStr == "" {
-						idStr = "(unlabeled)"
-					}
-					return nil, fmt.Errorf("first box (label '%s') cannot have touch-left prefix '|'", idStr)
-				}
-				// Strip the "|" prefix
-				coordsStr = strings.TrimPrefix(coordsStr, "|")
-			}
-
-			coords := strings.Split(coordsStr, ",")
-			if len(coords) != 2 && len(coords) != 3 && len(coords) != 4 {
-				return nil, fmt.Errorf("invalid coordinate definition: '%s'", line)
-			}
-
-			// Parse GridX coordinate (may be relative or absolute)
-			coordX, err := parseCoordinate(coords[0])
-			if err != nil {
-				return nil, fmt.Errorf("invalid X coordinate in line: '%s'", line)
-			}
-
-			// Parse GridY coordinate (may be relative or absolute)
-			coordY, err := parseCoordinate(coords[1])
-			if err != nil {
-				return nil, fmt.Errorf("invalid Y coordinate in line: '%s'", line)
-			}
-
-			// Parse GridWidth and GridHeight (absolute only)
-			var gridWidth float64
-			var gridHeight int
-			if len(coords) == 4 {
-				gridWidth, err = parseNumberOrFraction(coords[2])
-				if err != nil {
-					return nil, fmt.Errorf("invalid width in line: '%s'", line)
-				}
-				gridHeight, err = strconv.Atoi(strings.TrimSpace(coords[3]))
-				if err != nil {
-					return nil, fmt.Errorf("invalid height in line: '%s'", line)
-				}
-				// Validate dimensions
-				if gridWidth < 0.2 {
-					idStr := id
-					if idStr == "" {
-						idStr = "(unlabeled)"
-					}
-					return nil, fmt.Errorf("box '%s': GridWidth must be >= 0.2, got %.1f", idStr, gridWidth)
-				}
-				if gridHeight < 1 {
-					idStr := id
-					if idStr == "" {
-						idStr = "(unlabeled)"
-					}
-					return nil, fmt.Errorf("box '%s': GridHeight must be >= 1, got %d", idStr, gridHeight)
-				}
-			} else if len(coords) == 3 {
-				// Custom width, default height
-				gridWidth, err = parseNumberOrFraction(coords[2])
-				if err != nil {
-					return nil, fmt.Errorf("invalid width in line: '%s'", line)
-				}
-				gridHeight = 1 // Default height
-				// Validate width
-				if gridWidth < 0.2 {
-					idStr := id
-					if idStr == "" {
-						idStr = "(unlabeled)"
-					}
-					return nil, fmt.Errorf("box '%s': GridWidth must be >= 0.2, got %.1f", idStr, gridWidth)
-				}
-			} else {
-				// Use defaults (len == 2)
-				gridWidth = 2.0
-				gridHeight = 1
-			}
-
-			// Check if first box tries to use relative coordinates
-			// Inside a container, previousGridX/Y are set to container base, so relative coords are OK
-			if previousBoxID == "" && !inContainer && (coordX.IsRelative || coordY.IsRelative) {
-				idStr := id
-				if idStr == "" {
-					idStr = "(unlabeled)"
-				}
-				return nil, fmt.Errorf("first box (label '%s') cannot use relative coordinates", idStr)
-			}
-
-			// Validate touch-left requirements
-			if touchLeft {
-				idStr := id
-				if idStr == "" {
-					idStr = "(unlabeled)"
-				}
-				// Y coordinate must be 0 (relative, same row)
-				if !coordY.IsRelative || coordY.Value != 0 {
-					return nil, fmt.Errorf("box '%s': touch-left prefix '|' requires Y coordinate to be 0 (same row as previous box)", idStr)
-				}
-				// X coordinate must be relative with "+" prefix (positive relative)
-				if !coordX.IsRelative || coordX.Value <= 0 {
-					return nil, fmt.Errorf("box '%s': touch-left prefix '|' requires X coordinate to be relative with '+' prefix (e.g. '+2'), got relative=%v value=%d", idStr, coordX.IsRelative, coordX.Value)
-				}
-			}
-
-			// Resolve coordinates
-			var gridX, gridY int
-			if coordX.IsRelative {
-				gridX = previousGridX + coordX.Value
-			} else if inContainer {
-				gridX = containerBaseX + coordX.Value
-			} else {
-				gridX = coordX.Value
-			}
-
-			if coordY.IsRelative {
-				gridY = previousGridY + coordY.Value
-			} else if inContainer {
-				gridY = containerBaseY + coordY.Value
-			} else {
-				gridY = coordY.Value
-			}
-
-			// Validate that resulting coordinates are positive
-			if gridX < 1 {
-				idStr := id
-				if idStr == "" {
-					idStr = "(unlabeled)"
-				}
-				return nil, fmt.Errorf("box '%s': relative GridX coordinate resulted in invalid value %d (must be >= 1)", idStr, gridX)
-			}
-			if gridY < 1 {
-				idStr := id
-				if idStr == "" {
-					idStr = "(unlabeled)"
-				}
-				return nil, fmt.Errorf("box '%s': relative GridY coordinate resulted in invalid value %d (must be >= 1)", idStr, gridY)
-			}
-			// Parse label and optional style attributes
-			labelAndStyle := strings.TrimSpace(coordsAndLabelParts[1])
-
-			// Extract @GroupName suffix (e.g., "Stefanie, p @Team" -> group="Team")
-			var groupName string
-			if atIdx := strings.LastIndex(labelAndStyle, " @"); atIdx >= 0 {
-				groupName = strings.TrimSpace(labelAndStyle[atIdx+2:])
-				labelAndStyle = strings.TrimSpace(labelAndStyle[:atIdx])
-			}
-
-			labelParts := strings.SplitN(labelAndStyle, ",", 2)
-			if len(labelParts) == 0 {
-				return nil, fmt.Errorf("invalid label format: %s", labelAndStyle)
-			}
-			label := strings.TrimSpace(labelParts[0])
-
-			// Parse optional styles (e.g., "rb-g" -> red border + gray background)
-			var styleStr string
-			if len(labelParts) == 2 {
-				styleStr = strings.TrimSpace(labelParts[1])
-			}
-			parsedStyles := parseBoxStyles(styleStr, customColors)
-
-			backgroundColor := parsedStyles.BackgroundColor
-			borderColor := parsedStyles.BorderColor
-			borderWidth := parsedStyles.BorderWidth
-			fontSize := parsedStyles.FontSize
-			textColor := parsedStyles.TextColor
-
-			spec.Boxes = append(spec.Boxes, BoxSpec{
-				ID:          id,
-				GridX:       gridX,
-				GridY:       gridY,
-				GridWidth:   gridWidth,
-				GridHeight:  gridHeight,
-				Label:       label,
-				Color:       backgroundColor,
-				BorderColor: borderColor,
-				BorderWidth: borderWidth,
-				FontSize:    fontSize,
-				TextColor:   textColor,
-				TouchLeft:   touchLeft,
-				Group:       groupName,
-			})
-
-			// Track box-to-group mapping
-			if groupName != "" {
-				boxGroups[id] = groupName
-			}
-
-			// Create auto-arrow if prefix was present
-			if autoArrow {
-				spec.Arrows = append(spec.Arrows, ArrowSpec{
-					FromID: previousBoxID,
-					ToID:   id,
-				})
-			}
-
-			// Update previous box tracking
-			previousBoxID = id
-			previousGridX = gridX
-			previousGridY = gridY
-		} else {
-			// In arrow section, non-arrow lines are invalid
-			return nil, fmt.Errorf("invalid arrow definition: '%s'", line)
+			groupDefs[groupName] = groupLabel
+			continue
 		}
+
+		// Parse box: "dev: 1,2: Sprint Planning" or ">3,2: Daily Standup" (no ID)
+		parts := strings.SplitN(line, ":", 3)
+
+		var id string
+		var coordsAndLabelParts []string
+
+		if len(parts) == 3 {
+			// Format: "ID: coords: label"
+			id = strings.TrimSpace(parts[0])
+			// Validate ID: alphanumeric + underscore + hyphen only
+			if id == "" {
+				return nil, fmt.Errorf("invalid box definition: empty ID in line '%s'", line)
+			}
+			for _, ch := range id {
+				if (ch < 'a' || ch > 'z') && (ch < 'A' || ch > 'Z') &&
+					(ch < '0' || ch > '9') && ch != '_' && ch != '-' {
+					return nil, fmt.Errorf("invalid ID '%s': must contain only alphanumeric characters, underscore, or hyphen", id)
+				}
+			}
+			coordsAndLabelParts = parts[1:3]
+		} else if len(parts) == 2 {
+			// Format: "coords: label" (no ID)
+			id = "" // Will be assigned internal ID if needed
+			coordsAndLabelParts = parts
+		} else {
+			return nil, fmt.Errorf("invalid box definition: '%s'", line)
+		}
+
+		// Generate internal ID for boxes without explicit IDs
+		if id == "" {
+			id = fmt.Sprintf("_box_%d", internalIDCounter)
+			internalIDCounter++
+		}
+
+		// Check for auto-arrow prefix ">" or touch-left prefix "|"
+		coordsStr := strings.TrimSpace(coordsAndLabelParts[0])
+		autoArrow := strings.HasPrefix(coordsStr, ">")
+		touchLeft := strings.HasPrefix(coordsStr, "|")
+
+		if autoArrow {
+			// Check if this is the first box
+			if previousBoxID == "" {
+				return nil, fmt.Errorf("first box (label '%s') cannot have auto-arrow prefix '>'", id)
+			}
+			// Strip the ">" prefix
+			coordsStr = strings.TrimPrefix(coordsStr, ">")
+		} else if touchLeft {
+			// Check if this is the first box
+			if previousBoxID == "" {
+				idStr := id
+				if idStr == "" {
+					idStr = "(unlabeled)"
+				}
+				return nil, fmt.Errorf("first box (label '%s') cannot have touch-left prefix '|'", idStr)
+			}
+			// Strip the "|" prefix
+			coordsStr = strings.TrimPrefix(coordsStr, "|")
+		}
+
+		coords := strings.Split(coordsStr, ",")
+		if len(coords) != 2 && len(coords) != 3 && len(coords) != 4 {
+			return nil, fmt.Errorf("invalid coordinate definition: '%s'", line)
+		}
+
+		// Parse GridX coordinate (may be relative or absolute)
+		coordX, err := parseCoordinate(coords[0])
+		if err != nil {
+			return nil, fmt.Errorf("invalid X coordinate in line: '%s'", line)
+		}
+
+		// Parse GridY coordinate (may be relative or absolute)
+		coordY, err := parseCoordinate(coords[1])
+		if err != nil {
+			return nil, fmt.Errorf("invalid Y coordinate in line: '%s'", line)
+		}
+
+		// Parse GridWidth and GridHeight (absolute only)
+		var gridWidth float64
+		var gridHeight int
+		if len(coords) == 4 {
+			gridWidth, err = parseNumberOrFraction(coords[2])
+			if err != nil {
+				return nil, fmt.Errorf("invalid width in line: '%s'", line)
+			}
+			gridHeight, err = strconv.Atoi(strings.TrimSpace(coords[3]))
+			if err != nil {
+				return nil, fmt.Errorf("invalid height in line: '%s'", line)
+			}
+			// Validate dimensions
+			if gridWidth < 0.2 {
+				idStr := id
+				if idStr == "" {
+					idStr = "(unlabeled)"
+				}
+				return nil, fmt.Errorf("box '%s': GridWidth must be >= 0.2, got %.1f", idStr, gridWidth)
+			}
+			if gridHeight < 1 {
+				idStr := id
+				if idStr == "" {
+					idStr = "(unlabeled)"
+				}
+				return nil, fmt.Errorf("box '%s': GridHeight must be >= 1, got %d", idStr, gridHeight)
+			}
+		} else if len(coords) == 3 {
+			// Custom width, default height
+			gridWidth, err = parseNumberOrFraction(coords[2])
+			if err != nil {
+				return nil, fmt.Errorf("invalid width in line: '%s'", line)
+			}
+			gridHeight = 1 // Default height
+			// Validate width
+			if gridWidth < 0.2 {
+				idStr := id
+				if idStr == "" {
+					idStr = "(unlabeled)"
+				}
+				return nil, fmt.Errorf("box '%s': GridWidth must be >= 0.2, got %.1f", idStr, gridWidth)
+			}
+		} else {
+			// Use defaults (len == 2)
+			gridWidth = 2.0
+			gridHeight = 1
+		}
+
+		// Check if first box tries to use relative coordinates
+		// Inside a container, previousGridX/Y are set to container base, so relative coords are OK
+		if previousBoxID == "" && !inContainer && (coordX.IsRelative || coordY.IsRelative) {
+			idStr := id
+			if idStr == "" {
+				idStr = "(unlabeled)"
+			}
+			return nil, fmt.Errorf("first box (label '%s') cannot use relative coordinates", idStr)
+		}
+
+		// Validate touch-left requirements
+		if touchLeft {
+			idStr := id
+			if idStr == "" {
+				idStr = "(unlabeled)"
+			}
+			// Y coordinate must be 0 (relative, same row)
+			if !coordY.IsRelative || coordY.Value != 0 {
+				return nil, fmt.Errorf("box '%s': touch-left prefix '|' requires Y coordinate to be 0 (same row as previous box)", idStr)
+			}
+			// X coordinate must be relative with "+" prefix (positive relative)
+			if !coordX.IsRelative || coordX.Value <= 0 {
+				return nil, fmt.Errorf("box '%s': touch-left prefix '|' requires X coordinate to be relative with '+' prefix (e.g. '+2'), got relative=%v value=%d", idStr, coordX.IsRelative, coordX.Value)
+			}
+		}
+
+		// Resolve coordinates
+		var gridX, gridY int
+		if coordX.IsRelative {
+			gridX = previousGridX + coordX.Value
+		} else if inContainer {
+			gridX = containerBaseX + coordX.Value
+		} else {
+			gridX = coordX.Value
+		}
+
+		if coordY.IsRelative {
+			gridY = previousGridY + coordY.Value
+		} else if inContainer {
+			gridY = containerBaseY + coordY.Value
+		} else {
+			gridY = coordY.Value
+		}
+
+		// Validate that resulting coordinates are positive
+		if gridX < 1 {
+			idStr := id
+			if idStr == "" {
+				idStr = "(unlabeled)"
+			}
+			return nil, fmt.Errorf("box '%s': relative GridX coordinate resulted in invalid value %d (must be >= 1)", idStr, gridX)
+		}
+		if gridY < 1 {
+			idStr := id
+			if idStr == "" {
+				idStr = "(unlabeled)"
+			}
+			return nil, fmt.Errorf("box '%s': relative GridY coordinate resulted in invalid value %d (must be >= 1)", idStr, gridY)
+		}
+		// Parse label and optional style attributes
+		labelAndStyle := strings.TrimSpace(coordsAndLabelParts[1])
+
+		// Extract @GroupName suffix (e.g., "Stefanie, p @Team" -> group="Team")
+		var groupName string
+		if atIdx := strings.LastIndex(labelAndStyle, " @"); atIdx >= 0 {
+			groupName = strings.TrimSpace(labelAndStyle[atIdx+2:])
+			labelAndStyle = strings.TrimSpace(labelAndStyle[:atIdx])
+		}
+
+		labelParts := strings.SplitN(labelAndStyle, ",", 2)
+		if len(labelParts) == 0 {
+			return nil, fmt.Errorf("invalid label format: %s", labelAndStyle)
+		}
+		label := strings.TrimSpace(labelParts[0])
+
+		// Parse optional styles (e.g., "rb-g" -> red border + gray background)
+		var styleStr string
+		if len(labelParts) == 2 {
+			styleStr = strings.TrimSpace(labelParts[1])
+		}
+		parsedStyles := parseBoxStyles(styleStr, customColors)
+
+		backgroundColor := parsedStyles.BackgroundColor
+		borderColor := parsedStyles.BorderColor
+		borderWidth := parsedStyles.BorderWidth
+		fontSize := parsedStyles.FontSize
+		textColor := parsedStyles.TextColor
+
+		spec.Boxes = append(spec.Boxes, BoxSpec{
+			ID:          id,
+			GridX:       gridX,
+			GridY:       gridY,
+			GridWidth:   gridWidth,
+			GridHeight:  gridHeight,
+			Label:       label,
+			Color:       backgroundColor,
+			BorderColor: borderColor,
+			BorderWidth: borderWidth,
+			FontSize:    fontSize,
+			TextColor:   textColor,
+			TouchLeft:   touchLeft,
+			Group:       groupName,
+		})
+
+		// Track box-to-group mapping
+		if groupName != "" {
+			boxGroups[id] = groupName
+		}
+
+		// Create auto-arrow if prefix was present
+		if autoArrow {
+			spec.Arrows = append(spec.Arrows, ArrowSpec{
+				FromID: previousBoxID,
+				ToID:   id,
+			})
+		}
+
+		// Update previous box tracking
+		previousBoxID = id
+		previousGridX = gridX
+		previousGridY = gridY
 	}
 
 	// Check for unclosed container

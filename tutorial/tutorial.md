@@ -17,11 +17,10 @@ The simplest diagram: two boxes connected by an arrow. Each box has an **ID**, a
 ```
 A: 1,1: Box A
 B: 4,1: Box B
----
 A -> B
 ```
 
-Arrows are defined after the `---` separator using `ID -> ID` syntax.
+Arrows are defined using `ID -> ID` syntax. They can appear anywhere in the file.
 
 ![Basics](01-basics.svg)
 
@@ -46,7 +45,7 @@ F: >-2,0: End
 | `>0,+2` | Arrow from previous, 2 down |
 | `>-2,0` | Arrow from previous, 2 left |
 
-No `---` section needed when all arrows are auto-generated.
+No explicit arrows needed when all arrows are auto-generated.
 
 ![Positioning](02-positioning.svg)
 
@@ -78,14 +77,13 @@ F: 8,3,3/4: 3/4
 
 ## 4. Manual Arrows
 
-Define arrows explicitly in the `---` section. Arrows route automatically, including backward and diagonal paths.
+Define arrows explicitly using `ID -> ID`. Arrows route automatically, including backward and diagonal paths.
 
 ```
 A: 1,1: Input
 B: 4,1: Process
 C: 7,1: Output
 D: 4,3: Review
----
 A -> B
 B -> C
 C -> D
@@ -185,7 +183,6 @@ A: 1,1: Frontend @Dev
 B: 3,1: Backend @Dev
 C: 6,1: Deploy @Ops
 D: 8,1: Monitor @Ops
----
 A -> B
 B -> C
 C -> D
@@ -212,7 +209,6 @@ G: 3,2 [
 ]
 
 E: 8,1: External
----
 A -> B
 D -> E
 ```
@@ -223,7 +219,7 @@ D -> E
 | `B: 0,0: Alpha` | Box at container-relative 0,0 (actual: 3,2) |
 | `]` | End of container |
 
-Arrows from container boxes to outside boxes go in the main `---` section.
+Arrows between container boxes and outside boxes can appear anywhere.
 
 ![Containers](09-containers.svg)
 
@@ -245,7 +241,6 @@ A: 1,1: Phase 1, g
 B: 3,2: Phase 2, g
 C: 5,3: Phase 3, p
 D: 7,4: Phase 4, lp
----
 A -> B
 B -> C
 C -> D
@@ -276,7 +271,6 @@ D: 1,5: East
 E: 3,5: West
 F: 5,5: Backend
 G: 7,5: Frontend
----
 A -> B
 A -> C
 B -> D
@@ -293,39 +287,32 @@ Without `arrow-flow: down`, arrows prefer horizontal routing. With it, vertical 
 
 ## 12. Full Example
 
-Combining frontmatter, custom colors, groups, sizing, styles, and arrows.
+A Scrum workflow combining axes, legend, groups, auto-arrows, touch-left, sizing, styles, and a manual feedback arrow.
 
 ```
 ---
-x-label: Sprint Timeline
-y-label: Team
-color: done = #22C55E
-color: active = #3B82F6
-legend: done=Completed
-legend: active=In Progress
-legend: g=Blocked
+x-label: Time
+y-label: Control
+legend: p=Planning
+legend: lp=Coding
 ---
-@BE: Backend
-@FE: Frontend
+@Sprint: Sprint
 
-A: 3,1,2: Sprint Goal, active
-
-B: 1,3: API, done @BE
-C: 3,3: Schema, done @BE
-D: 6,3: UI Mockup @FE
-E: 8,3: Components @FE
-
-F: 2,5,2: Integration, g
-G: 6,5,2: Review, lp
----
-A -> B
-A -> D
-B -> C
-C -> F
-D -> E
-E -> G
-F -> G
+A: 1,1: OKRs
+B: >+1,+1: Business Initiatives
+C: >+1,+1: Backlog Planning
+D: >+1,+1: Sprint Planning
+E: >+1,+1,1: Daily @Sprint
+F: >+1,+1: Developing, p @Sprint
+>+2,-1,1/2:
+>0,+1: Developing, p @Sprint
+|+2,0,1: Idle, lp @Sprint
+G: >+1,-1,2: Sprint Review @Sprint
+9,1: SCRUM, nbb-rt-2t
+G -> C
 ```
+
+The `>` prefix chains auto-arrows through the flow. The manual `G -> C` arrow routes Sprint Review back to Backlog Planning. The `@Sprint` group wraps the sprint cycle in a dashed border.
 
 ![Full Example](12-full-example.svg)
 

@@ -5,7 +5,6 @@ A: 1,1: Frontend @Dev
 B: 3,1: Backend @Dev
 C: 6,1: Deploy @Ops
 D: 8,1: Monitor @Ops
----
 A -> B
 B -> C
 C -> D
