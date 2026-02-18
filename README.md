@@ -2,7 +2,7 @@
 
 Generate SVG diagrams from plain text. Define boxes on a grid, connect them with arrows, and get clean vector output.
 
-Written for the diagrams in my [Theory of Control of Software Engineering](https://www.tabulamag.com/p/introduction-to-theory-of-control), designed to be embedded into [sli.dev](https://sli.dev) markdown presentations.
+Written for the diagrams in my [Theory of Control of Software Engineering](https://www.tabulamag.com/p/introduction-to-theory-of-control), designed to be embedded into markdown presentations built with [Slidev](https://sli.dev) or [reveal.js](https://revealjs.com). Pairs well with [dex](https://github.com/StephanSchmidt/dex), a CLI tool for reordering and manipulating slide decks.
 
 ### AI-friendly by design
 
