@@ -1,0 +1,6 @@
+A: 1,1: Start
+B: >+2,0: Step 1
+C: >+2,0: Step 2
+D: >0,+2: Step 3
+E: >-2,0: Step 4
+F: >-2,0: End

@@ -1,0 +1,17 @@
+---
+arrow-flow: down
+---
+A: 4,1: CEO
+B: 2,3: VP Sales
+C: 6,3: VP Eng
+D: 1,5: East
+E: 3,5: West
+F: 5,5: Backend
+G: 7,5: Frontend
+---
+A -> B
+A -> C
+B -> D
+B -> E
+C -> F
+C -> G

@@ -171,6 +171,10 @@ color: green = #00FF00
 
 Custom colors can be used as style codes (`green` for background, `greent` for text color).
 
+## Tutorial
+
+See the [step-by-step tutorial](tutorial/tutorial.md) for a progressive guide covering all features — from basic boxes to full diagrams with custom colors, groups, containers, and arrow flow.
+
 ## CLI options
 
 ```

@@ -1,0 +1,8 @@
+---
+color: blue = #3B82F6
+color: green = #22C55E
+---
+A: 1,1: Blue, blue
+B: 3,1: Blue Text, bluet
+C: 5,1: Green, green
+D: 7,1: Green Text, greent

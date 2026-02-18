@@ -1,0 +1,13 @@
+A: 1,1: Outside
+
+G: 3,2 [
+    B: 0,0: Alpha
+    C: 2,0: Beta
+    D: 0,2: Gamma
+    B -> C
+]
+
+E: 8,1: External
+---
+A -> B
+D -> E

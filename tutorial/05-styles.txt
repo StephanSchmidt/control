@@ -1,0 +1,8 @@
+A: 1,1: Gray, g
+B: 3,1: Purple, p
+C: 5,1: Light Purple, lp
+D: 1,3: Red Border, rb
+E: 3,3: Red Text, rt
+F: 5,3: No Border, nbb
+G: 1,5: Double Text, 2t
+H: 4,5: Combined, g-rb
