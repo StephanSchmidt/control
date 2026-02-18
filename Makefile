@@ -60,5 +60,5 @@ upgrade-deps:
 	go mod tidy
 	gotestsum ./...
 
-release: all
+release:
 	GITHUB_TOKEN=$$(gh auth token) HOMEBREW_CONTROL_TOKEN=$$(gh auth token) goreleaser release --clean
