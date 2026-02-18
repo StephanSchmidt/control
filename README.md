@@ -6,6 +6,10 @@ Written for the diagrams in my [Theory of Control of Software Engineering](https
 
 ![Scrum workflow example](examples/scrum.svg)
 
+## Tutorial
+
+See the [step-by-step tutorial](tutorial/tutorial.md) for a progressive guide covering all features — from basic boxes to full diagrams with custom colors, groups, containers, and arrow flow.
+
 ## Install
 
 ### Homebrew (macOS/Linux)
@@ -170,10 +174,6 @@ color: green = #00FF00
 | `color`   | Custom color: `name = #hex`                |
 
 Custom colors can be used as style codes (`green` for background, `greent` for text color).
-
-## Tutorial
-
-See the [step-by-step tutorial](tutorial/tutorial.md) for a progressive guide covering all features — from basic boxes to full diagrams with custom colors, groups, containers, and arrow flow.
 
 ## CLI options
 
