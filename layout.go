@@ -43,7 +43,7 @@ func calculateTouchExtension(config DiagramConfig) int {
 const groupPadding = 15
 
 // Layout converts a DiagramSpec into a concrete Diagram with pixel coordinates
-func Layout(spec *DiagramSpec, config DiagramConfig, legend []LegendEntry, groups []GroupDef) (*Diagram, map[string]BoxData) {
+func Layout(spec *DiagramSpec, config DiagramConfig, legend []LegendEntry, groups []GroupDef, arrowFlow string) (*Diagram, map[string]BoxData) {
 	// Find maximum grid positions
 	maxGridX := 0
 	maxGridY := 0
@@ -152,19 +152,26 @@ func Layout(spec *DiagramSpec, config DiagramConfig, legend []LegendEntry, group
 			Y2: toBox.PixelY + toBox.Height,
 		}
 
+		// Resolve per-arrow flow vs global flow
+		flow := arrowFlow
+		if arrowSpec.Flow != "" {
+			flow = arrowSpec.Flow
+		}
+
 		plan, err := RouteArrow(
 			box1, box2,
 			fromBox.GridX, fromBox.GridY,
 			toBox.GridX, toBox.GridY,
 			allBoxes,
 			arrowSpec.FromID, arrowSpec.ToID,
+			flow,
 		)
 		if err != nil {
 			fmt.Printf("Error routing arrow from %s to %s: %v\n", arrowSpec.FromID, arrowSpec.ToID, err)
 			continue
 		}
 
-		diagram.AddArrow(plan.StartX, plan.StartY, plan.EndX, plan.EndY, plan.VerticalFirst, arrowSpec.FromID, arrowSpec.ToID, plan.Strategy, plan.AllCandidates)
+		diagram.AddArrow(plan.StartX, plan.StartY, plan.EndX, plan.EndY, plan.VerticalFirst, plan.NumSegments, arrowSpec.FromID, arrowSpec.ToID, plan.Strategy, plan.AllCandidates)
 	}
 
 	// Resolve groups to pixel coordinates

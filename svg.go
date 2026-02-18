@@ -77,13 +77,23 @@ func twoBentArrow(fromX, fromY, toX, toY int) string {
 		toX, toY) // Horizontal to end point
 }
 
+// twoBentArrowVertical generates a 3-segment arrow (vertical, horizontal, vertical)
+func twoBentArrowVertical(fromX, fromY, toX, toY int) string {
+	midY := (fromY + toY) / 2
+	return fmt.Sprintf(`<polyline points="%d,%d %d,%d %d,%d %d,%d" fill="none" stroke="#000" stroke-width="2" marker-end="url(#arrowhead)"/>`,
+		fromX, fromY, // Start point
+		fromX, midY, // Vertical to midpoint
+		toX, midY, // Horizontal to target X
+		toX, toY) // Vertical to end point
+}
+
 // drawGroup generates a dashed rounded rectangle with an optional label
 func drawGroup(x, y, width, height int, label string, font *FontData) string {
 	result := fmt.Sprintf(`<rect x="%d" y="%d" width="%d" height="%d" fill="none" stroke="#000" stroke-width="1.5" stroke-dasharray="6,4" rx="8"/>`,
 		x, y, width, height)
 	if label != "" {
 		attrs := map[string]string{}
-		result += drawText(x+10, y+18, label, 18, attrs, font)
+		result += drawText(x+10, y+20, label, 24, attrs, font)
 	}
 	return result
 }
@@ -150,7 +160,7 @@ func drawBoxText(x, y, width, height, fontSize int, textColor string, lines []st
 	result := ""
 	for i, line := range lines {
 		attrs := map[string]string{
-			"font-weight":       "bold",
+			"font-weight":       "normal",
 			"text-anchor":       "middle",
 			"dominant-baseline": "middle",
 		}

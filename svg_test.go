@@ -163,6 +163,37 @@ func TestTwoBentArrow(t *testing.T) {
 	}
 }
 
+func TestTwoBentArrowVertical(t *testing.T) {
+	arrow := twoBentArrowVertical(10, 20, 50, 60)
+
+	if !strings.Contains(arrow, `<polyline`) {
+		t.Error("Should be a polyline element")
+	}
+
+	// Check for 4 points (V-H-V path)
+	midY := (20 + 60) / 2 // 40
+
+	if !strings.Contains(arrow, `points="10,20`) {
+		t.Error("Should start at 10,20")
+	}
+
+	if !strings.Contains(arrow, `10,40`) {
+		t.Errorf("Should have vertical segment to 10,%d", midY)
+	}
+
+	if !strings.Contains(arrow, `50,40`) {
+		t.Errorf("Should have horizontal segment to 50,%d", midY)
+	}
+
+	if !strings.Contains(arrow, `50,60"`) {
+		t.Error("Should end at 50,60")
+	}
+
+	if !strings.Contains(arrow, `marker-end="url(#arrowhead)"`) {
+		t.Error("Should have arrowhead marker")
+	}
+}
+
 func TestDrawBox(t *testing.T) {
 	box := drawBox(10, 20, 100, 50, "#FFCE33", "", 0)
 
@@ -233,7 +264,7 @@ func TestDrawLine(t *testing.T) {
 
 func TestDrawText(t *testing.T) {
 	attrs := map[string]string{
-		"font-weight": "bold",
+		"font-weight": "normal",
 		"text-anchor": "middle",
 	}
 
@@ -259,7 +290,7 @@ func TestDrawText(t *testing.T) {
 		t.Error("Should contain text content")
 	}
 
-	if !strings.Contains(text, `font-weight="bold"`) {
+	if !strings.Contains(text, `font-weight="normal"`) {
 		t.Error("Should have font-weight attribute")
 	}
 
@@ -290,7 +321,7 @@ func TestDrawBoxText(t *testing.T) {
 		t.Error("Should have font-size=\"24\"")
 	}
 
-	if !strings.Contains(text, `font-weight="bold"`) {
+	if !strings.Contains(text, `font-weight="normal"`) {
 		t.Error("Should have bold font weight")
 	}
 

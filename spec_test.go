@@ -2782,3 +2782,332 @@ func TestParseDiagramSpec_Group_DefinitionWithoutBoxes(t *testing.T) {
 		t.Errorf("Expected 0 groups (no boxes assigned), got %d", len(spec.Groups))
 	}
 }
+
+func TestParseFrontmatter_ArrowFlow(t *testing.T) {
+	text := `---
+arrow-flow: down
+---
+a: 1,1: Box A
+b: 3,2: Box B
+`
+	fm, remaining := ParseFrontmatter(text)
+
+	if fm.ArrowFlow != "down" {
+		t.Errorf("Expected ArrowFlow='down', got %q", fm.ArrowFlow)
+	}
+
+	if !strings.Contains(remaining, "a: 1,1: Box A") {
+		t.Error("Remaining text should contain box definitions")
+	}
+}
+
+func TestParseFrontmatter_ArrowFlowUndelimited(t *testing.T) {
+	text := `arrow-flow: down
+a: 1,1: Box A
+`
+	fm, remaining := ParseFrontmatter(text)
+
+	if fm.ArrowFlow != "down" {
+		t.Errorf("Expected ArrowFlow='down', got %q", fm.ArrowFlow)
+	}
+
+	if !strings.Contains(remaining, "a: 1,1: Box A") {
+		t.Error("Remaining text should contain box definitions")
+	}
+}
+
+func TestParseDiagramSpec_ArrowFlowPerArrow(t *testing.T) {
+	text := `
+a: 1,1: Box A
+b: 3,2: Box B
+c: 5,1: Box C
+---
+a -> b | down
+b -> c
+`
+	spec, err := ParseDiagramSpec(text, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if len(spec.Arrows) != 2 {
+		t.Fatalf("Expected 2 arrows, got %d", len(spec.Arrows))
+	}
+
+	// First arrow should have flow="down"
+	if spec.Arrows[0].Flow != "down" {
+		t.Errorf("Expected first arrow Flow='down', got %q", spec.Arrows[0].Flow)
+	}
+
+	// Second arrow should have no flow
+	if spec.Arrows[1].Flow != "" {
+		t.Errorf("Expected second arrow Flow='', got %q", spec.Arrows[1].Flow)
+	}
+}
+
+func TestParseDiagramSpec_ArrowFlowPerArrowWithSpaces(t *testing.T) {
+	text := `
+a: 1,1: Box A
+b: 3,2: Box B
+---
+a -> b | down
+`
+	spec, err := ParseDiagramSpec(text, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if spec.Arrows[0].FromID != "a" {
+		t.Errorf("Expected FromID='a', got %q", spec.Arrows[0].FromID)
+	}
+	if spec.Arrows[0].ToID != "b" {
+		t.Errorf("Expected ToID='b', got %q", spec.Arrows[0].ToID)
+	}
+	if spec.Arrows[0].Flow != "down" {
+		t.Errorf("Expected Flow='down', got %q", spec.Arrows[0].Flow)
+	}
+}
+
+// Container tests
+
+func TestParseDiagramSpec_ContainerBasic(t *testing.T) {
+	text := `
+G: 1,1 [
+    X: 0,0: A
+    +1,0: B
+    Y: 4,4: C
+    X -> Y
+]
+`
+	spec, err := ParseDiagramSpec(text, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if len(spec.Boxes) != 3 {
+		t.Fatalf("Expected 3 boxes, got %d", len(spec.Boxes))
+	}
+
+	// X at 0,0 inside container at 1,1 → grid (1,1)
+	if spec.Boxes[0].ID != "X" {
+		t.Errorf("Expected box 0 ID 'X', got '%s'", spec.Boxes[0].ID)
+	}
+	if spec.Boxes[0].GridX != 1 || spec.Boxes[0].GridY != 1 {
+		t.Errorf("Expected X at (1,1), got (%d,%d)", spec.Boxes[0].GridX, spec.Boxes[0].GridY)
+	}
+	if spec.Boxes[0].Label != "A" {
+		t.Errorf("Expected label 'A', got '%s'", spec.Boxes[0].Label)
+	}
+
+	// B at +1,0 relative to X(1,1) → grid (2,1)
+	if spec.Boxes[1].GridX != 2 || spec.Boxes[1].GridY != 1 {
+		t.Errorf("Expected B at (2,1), got (%d,%d)", spec.Boxes[1].GridX, spec.Boxes[1].GridY)
+	}
+
+	// Y at 4,4 inside container at 1,1 → grid (5,5)
+	if spec.Boxes[2].ID != "Y" {
+		t.Errorf("Expected box 2 ID 'Y', got '%s'", spec.Boxes[2].ID)
+	}
+	if spec.Boxes[2].GridX != 5 || spec.Boxes[2].GridY != 5 {
+		t.Errorf("Expected Y at (5,5), got (%d,%d)", spec.Boxes[2].GridX, spec.Boxes[2].GridY)
+	}
+
+	// Arrow X → Y
+	if len(spec.Arrows) != 1 {
+		t.Fatalf("Expected 1 arrow, got %d", len(spec.Arrows))
+	}
+	if spec.Arrows[0].FromID != "X" || spec.Arrows[0].ToID != "Y" {
+		t.Errorf("Expected arrow X->Y, got %s->%s", spec.Arrows[0].FromID, spec.Arrows[0].ToID)
+	}
+
+	// Containers are purely organizational — no group created
+	if len(spec.Groups) != 0 {
+		t.Errorf("Expected 0 groups (containers don't create groups), got %d", len(spec.Groups))
+	}
+}
+
+func TestParseDiagramSpec_ContainerWithThirdField(t *testing.T) {
+	// Third field after ID and coords is accepted (ignored — containers have no label)
+	text := `
+G: 1,1: My Group [
+    X: 0,0: Hello
+]
+`
+	spec, err := ParseDiagramSpec(text, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if len(spec.Boxes) != 1 {
+		t.Fatalf("Expected 1 box, got %d", len(spec.Boxes))
+	}
+	if spec.Boxes[0].GridX != 1 || spec.Boxes[0].GridY != 1 {
+		t.Errorf("Expected X at (1,1), got (%d,%d)", spec.Boxes[0].GridX, spec.Boxes[0].GridY)
+	}
+	if len(spec.Groups) != 0 {
+		t.Errorf("Expected 0 groups, got %d", len(spec.Groups))
+	}
+}
+
+func TestParseDiagramSpec_ContainerMoved(t *testing.T) {
+	text := `
+G: 3,2 [
+    0,0: A
+    +1,0: B
+    4,4: C
+]
+`
+	spec, err := ParseDiagramSpec(text, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if len(spec.Boxes) != 3 {
+		t.Fatalf("Expected 3 boxes, got %d", len(spec.Boxes))
+	}
+
+	// A at 0,0 inside container at 3,2 → grid (3,2)
+	if spec.Boxes[0].GridX != 3 || spec.Boxes[0].GridY != 2 {
+		t.Errorf("Expected A at (3,2), got (%d,%d)", spec.Boxes[0].GridX, spec.Boxes[0].GridY)
+	}
+
+	// B at +1,0 relative to A(3,2) → grid (4,2)
+	if spec.Boxes[1].GridX != 4 || spec.Boxes[1].GridY != 2 {
+		t.Errorf("Expected B at (4,2), got (%d,%d)", spec.Boxes[1].GridX, spec.Boxes[1].GridY)
+	}
+
+	// C at 4,4 inside container at 3,2 → grid (7,6)
+	if spec.Boxes[2].GridX != 7 || spec.Boxes[2].GridY != 6 {
+		t.Errorf("Expected C at (7,6), got (%d,%d)", spec.Boxes[2].GridX, spec.Boxes[2].GridY)
+	}
+}
+
+func TestParseDiagramSpec_ContainerWithBoxesBeforeAfter(t *testing.T) {
+	text := `
+A: 1,1: Before
+G: 3,3 [
+    X: 0,0: Inside
+]
+B: 5,5: After
+`
+	spec, err := ParseDiagramSpec(text, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if len(spec.Boxes) != 3 {
+		t.Fatalf("Expected 3 boxes, got %d", len(spec.Boxes))
+	}
+
+	// A at (1,1)
+	if spec.Boxes[0].ID != "A" || spec.Boxes[0].GridX != 1 || spec.Boxes[0].GridY != 1 {
+		t.Errorf("Expected A at (1,1), got (%d,%d)", spec.Boxes[0].GridX, spec.Boxes[0].GridY)
+	}
+
+	// X at 0,0 inside container at 3,3 → grid (3,3)
+	if spec.Boxes[1].ID != "X" || spec.Boxes[1].GridX != 3 || spec.Boxes[1].GridY != 3 {
+		t.Errorf("Expected X at (3,3), got (%d,%d)", spec.Boxes[1].GridX, spec.Boxes[1].GridY)
+	}
+
+	// B at (5,5) - absolute, outside container
+	if spec.Boxes[2].ID != "B" || spec.Boxes[2].GridX != 5 || spec.Boxes[2].GridY != 5 {
+		t.Errorf("Expected B at (5,5), got (%d,%d)", spec.Boxes[2].GridX, spec.Boxes[2].GridY)
+	}
+
+	// Containers don't create groups
+	if len(spec.Groups) != 0 {
+		t.Errorf("Expected 0 groups, got %d", len(spec.Groups))
+	}
+}
+
+func TestParseDiagramSpec_ContainerArrowsCrossBoundary(t *testing.T) {
+	text := `
+A: 1,1: Outside
+G: 3,3 [
+    X: 0,0: Inside
+]
+---
+A -> X
+`
+	spec, err := ParseDiagramSpec(text, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if len(spec.Arrows) != 1 {
+		t.Fatalf("Expected 1 arrow, got %d", len(spec.Arrows))
+	}
+	if spec.Arrows[0].FromID != "A" || spec.Arrows[0].ToID != "X" {
+		t.Errorf("Expected arrow A->X, got %s->%s", spec.Arrows[0].FromID, spec.Arrows[0].ToID)
+	}
+}
+
+func TestParseDiagramSpec_ContainerErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr string
+	}{
+		{
+			name: "nested container",
+			input: `
+G1: 1,1 [
+    G2: 2,2 [
+        0,0: A
+    ]
+]
+`,
+			wantErr: "nested containers not supported",
+		},
+		{
+			name: "unclosed container",
+			input: `
+G: 1,1 [
+    0,0: A
+`,
+			wantErr: "unclosed container 'G'",
+		},
+		{
+			name: "closing bracket outside container",
+			input: `
+1,1: A
+]
+`,
+			wantErr: "unexpected ']' outside container",
+		},
+		{
+			name: "separator inside container",
+			input: `
+G: 1,1 [
+    X: 0,0: A
+    ---
+    X -> X
+]
+`,
+			wantErr: "section separator not allowed inside container",
+		},
+		{
+			name: "container in arrow section",
+			input: `
+A: 1,1: Box
+---
+G: 2,2 [
+    0,0: Inside
+]
+`,
+			wantErr: "container not allowed in arrow section",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseDiagramSpec(tt.input, nil)
+			if err == nil {
+				t.Fatalf("Expected error containing %q, got nil", tt.wantErr)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("Expected error containing %q, got %q", tt.wantErr, err.Error())
+			}
+		})
+	}
+}

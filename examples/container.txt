@@ -1,0 +1,13 @@
+A: 1,1: Outside Box
+
+G: 3,2 [
+    X: 0,0: Alpha
+    +2,0: Beta
+    Y: >0,2: Gamma
+    X -> Y
+]
+
+B: 8,1: Another Box
+---
+A -> X
+Y -> B

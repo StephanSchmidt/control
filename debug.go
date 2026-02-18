@@ -111,8 +111,8 @@ func GenerateDebugOutput(diagram *Diagram, boxData map[string]BoxData) DebugOutp
 
 	// Collect arrow debug information
 	for _, arrow := range diagram.Arrows {
-		arrowType := classifyArrowType(arrow.FromX, arrow.FromY, arrow.ToX, arrow.ToY, arrow.VerticalFirst, arrow.RoutingStrategy)
-		orientation := calculateArrowheadOrientation(arrow.FromX, arrow.FromY, arrow.ToX, arrow.ToY, arrow.VerticalFirst)
+		arrowType := classifyArrowType(arrow.FromX, arrow.FromY, arrow.ToX, arrow.ToY, arrow.NumSegments)
+		orientation := calculateArrowheadOrientation(arrow.FromX, arrow.FromY, arrow.ToX, arrow.ToY, arrow.NumSegments, arrow.VerticalFirst)
 
 		// Convert RouteCandidate to CandidateDebug
 		candidatesDebug := make([]CandidateDebug, 0, len(arrow.Candidates))
@@ -189,24 +189,22 @@ func GenerateDebugOutput(diagram *Diagram, boxData map[string]BoxData) DebugOutp
 	return output
 }
 
-// classifyArrowType determines the arrow rendering type based on coordinates and strategy
-func classifyArrowType(fromX, fromY, toX, toY int, verticalFirst bool, strategy string) string {
+// classifyArrowType determines the arrow rendering type based on coordinates and segment count
+func classifyArrowType(fromX, fromY, toX, toY int, numSegments int) string {
 	if fromX == toX {
 		return "straight_vertical"
 	}
 	if fromY == toY {
 		return "straight_horizontal"
 	}
-	// Two-segment arrows (one bend) have strategies: two_segment_vertical_first, two_segment_horizontal_first
-	// Three-segment arrows (two bends) have strategies: three_segment_horizontal_first, non_overlapping_horizontal
-	if strategy == "two_segment_vertical_first" || strategy == "two_segment_horizontal_first" {
+	if numSegments == 2 {
 		return "one_bent"
 	}
 	return "two_bent"
 }
 
 // calculateArrowheadOrientation determines which direction the arrowhead points
-func calculateArrowheadOrientation(fromX, fromY, toX, toY int, verticalFirst bool) string {
+func calculateArrowheadOrientation(fromX, fromY, toX, toY int, numSegments int, verticalFirst bool) string {
 	// For straight arrows, direction is obvious
 	if fromX == toX {
 		if toY > fromY {
@@ -221,21 +219,35 @@ func calculateArrowheadOrientation(fromX, fromY, toX, toY int, verticalFirst boo
 		return "left"
 	}
 
-	// For bent arrows, orientation depends on final segment
-	if verticalFirst {
-		// Final segment is horizontal
-		if toX > fromX {
-			return "right"
+	// For V-H-V (3 segments, vertical-first), final segment is vertical
+	if numSegments == 3 && verticalFirst {
+		if toY > fromY {
+			return "down"
 		}
-		return "left"
-	} else {
-		// For two-bent arrows (horizontal-first), need to determine final segment
-		// The final segment in twoBentArrow is horizontal: (midX,toY) -> (toX,toY)
+		return "up"
+	}
+
+	// For 2-segment vertical-first (V then H), final segment is horizontal
+	if verticalFirst {
 		if toX > fromX {
 			return "right"
 		}
 		return "left"
 	}
+
+	// For 2-segment horizontal-first (H then V), final segment is vertical
+	if numSegments == 2 {
+		if toY > fromY {
+			return "down"
+		}
+		return "up"
+	}
+
+	// For 3-segment H-V-H, final segment is horizontal
+	if toX > fromX {
+		return "right"
+	}
+	return "left"
 }
 
 // WriteDebugJSON writes debug output to a JSON file

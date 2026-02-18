@@ -23,6 +23,7 @@ type Arrow struct {
 	FromX, FromY    int
 	ToX, ToY        int
 	VerticalFirst   bool             // If true, use 2-segment routing (vertical then horizontal)
+	NumSegments     int              // 1=straight, 2=L-shape, 3=Z-shape
 	FromBoxID       string           // ID of source box (for debug output)
 	ToBoxID         string           // ID of destination box (for debug output)
 	RoutingStrategy string           // Name of routing strategy used (for debug output)
@@ -106,13 +107,14 @@ func (d *Diagram) AddBox(x, y, w, h int, text, color, borderColor string, border
 }
 
 // AddArrow adds an arrow between two points
-func (d *Diagram) AddArrow(fromX, fromY, toX, toY int, verticalFirst bool, fromID, toID, routingStrategy string, candidates []RouteCandidate) {
+func (d *Diagram) AddArrow(fromX, fromY, toX, toY int, verticalFirst bool, numSegments int, fromID, toID, routingStrategy string, candidates []RouteCandidate) {
 	d.Arrows = append(d.Arrows, Arrow{
 		FromX:           fromX,
 		FromY:           fromY,
 		ToX:             toX,
 		ToY:             toY,
 		VerticalFirst:   verticalFirst,
+		NumSegments:     numSegments,
 		FromBoxID:       fromID,
 		ToBoxID:         toID,
 		RoutingStrategy: routingStrategy,
@@ -176,22 +178,15 @@ func (d *Diagram) GenerateSVG() string {
 
 	// Draw arrows
 	for _, arrow := range d.Arrows {
-		if arrow.FromX == arrow.ToX || arrow.FromY == arrow.ToY {
-			// Vertical or horizontal arrow - single line
+		switch {
+		case arrow.FromX == arrow.ToX || arrow.FromY == arrow.ToY:
 			svg.WriteString(straightArrow(arrow.FromX, arrow.FromY, arrow.ToX, arrow.ToY))
-		} else {
-			// Check if this is a 2-segment or 3-segment arrow based on strategy
-			// Two-segment arrows have strategies: two_segment_vertical_first, two_segment_horizontal_first, straight_vertical
-			// Three-segment arrows have strategies: three_segment_horizontal_first, non_overlapping_horizontal
-			is3Segment := arrow.RoutingStrategy == "three_segment_horizontal_first" || arrow.RoutingStrategy == "non_overlapping_horizontal"
-
-			if is3Segment {
-				// Non-overlapping boxes - use three segments with two 90-degree angles
-				svg.WriteString(twoBentArrow(arrow.FromX, arrow.FromY, arrow.ToX, arrow.ToY))
-			} else {
-				// Two segments with one 90-degree angle (can be vertical-first or horizontal-first)
-				svg.WriteString(oneBentArrow(arrow.FromX, arrow.FromY, arrow.ToX, arrow.ToY, arrow.VerticalFirst))
-			}
+		case arrow.NumSegments == 3 && arrow.VerticalFirst:
+			svg.WriteString(twoBentArrowVertical(arrow.FromX, arrow.FromY, arrow.ToX, arrow.ToY))
+		case arrow.NumSegments == 3:
+			svg.WriteString(twoBentArrow(arrow.FromX, arrow.FromY, arrow.ToX, arrow.ToY))
+		default:
+			svg.WriteString(oneBentArrow(arrow.FromX, arrow.FromY, arrow.ToX, arrow.ToY, arrow.VerticalFirst))
 		}
 	}
 
@@ -212,11 +207,11 @@ func (d *Diagram) GenerateSVG() string {
 
 // Legend rendering constants
 const (
-	legendSquareSize = 15 // Size of the colored square
-	legendFontSize   = 14 // Font size for legend text
-	legendLineHeight = 22 // Vertical spacing between entries
+	legendSquareSize = 30 // Size of the colored square
+	legendFontSize   = 28 // Font size for legend text
+	legendLineHeight = 44 // Vertical spacing between entries
 	legendPadding    = 10 // Padding inside the legend area
-	legendTextGap    = 6  // Gap between square and text
+	legendTextGap    = 12 // Gap between square and text
 	legendTopMargin  = 50 // Top margin (same as diagram top margin)
 )
 
@@ -240,8 +235,8 @@ func (d *Diagram) renderLegend() string {
 
 		// Draw colored square (right-aligned)
 		squareX := startX - legendSquareSize
-		svg.WriteString(fmt.Sprintf(`<rect x="%d" y="%d" width="%d" height="%d" fill="%s" stroke="#000" stroke-width="1"/>`,
-			squareX, y, legendSquareSize, legendSquareSize, color))
+		fmt.Fprintf(&svg, `<rect x="%d" y="%d" width="%d" height="%d" fill="%s" stroke="#000" stroke-width="1"/>`,
+			squareX, y, legendSquareSize, legendSquareSize, color)
 
 		// Draw label text to the left of the square
 		textX := squareX - legendTextGap

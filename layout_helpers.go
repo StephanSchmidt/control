@@ -124,29 +124,12 @@ func checkSegmentCollision(x1, y1, x2, y2 int, allBoxes []BoxData, excludeIDs ma
 	return false
 }
 
-// checkTwoSegmentCollision checks if a 2-segment route collides with any boxes
-func checkTwoSegmentCollision(startX, startY, endX, endY int, verticalFirst bool, allBoxes []BoxData, fromID, toID string) bool {
-	// Create map of IDs to exclude (source and destination boxes)
-	excludeIDs := make(map[string]bool)
-	excludeIDs[fromID] = true
-	excludeIDs[toID] = true
-
-	if verticalFirst {
-		// Vertical segment: from (startX, startY) to (startX, endY)
-		if checkSegmentCollision(startX, startY, startX, endY, allBoxes, excludeIDs) {
-			return true
-		}
-		// Horizontal segment: from (startX, endY) to (endX, endY)
-		if checkSegmentCollision(startX, endY, endX, endY, allBoxes, excludeIDs) {
-			return true
-		}
-	} else {
-		// Horizontal segment: from (startX, startY) to (endX, startY)
-		if checkSegmentCollision(startX, startY, endX, startY, allBoxes, excludeIDs) {
-			return true
-		}
-		// Vertical segment: from (endX, startY) to (endX, endY)
-		if checkSegmentCollision(endX, startY, endX, endY, allBoxes, excludeIDs) {
+// checkPathCollision checks if a polyline path collides with any boxes.
+// points is a list of (x,y) pairs defining the path segments.
+func checkPathCollision(points []int, allBoxes []BoxData, fromID, toID string) bool {
+	excludeIDs := map[string]bool{fromID: true, toID: true}
+	for i := 0; i < len(points)-2; i += 2 {
+		if checkSegmentCollision(points[i], points[i+1], points[i+2], points[i+3], allBoxes, excludeIDs) {
 			return true
 		}
 	}
@@ -163,6 +146,7 @@ type RoutingPlan struct {
 	StartX, StartY, EndX, EndY int
 	Strategy                   string
 	VerticalFirst              bool
+	NumSegments                int // 1=straight, 2=L-shape, 3=Z-shape
 	AllCandidates              []RouteCandidate
 }
 
@@ -174,7 +158,9 @@ type RouteCandidate struct {
 	score                      int
 	boxWidth1, boxWidth2       int // Store box widths for scoring
 	rejected                   bool
-	rejectReason               string // "illegal_coordinates", "collision_detected", or empty if not rejected
+	rejectReason               string // "collision_detected", or empty if not rejected
+	flow                       string // Flow direction hint (e.g., "down")
+	segments                   []int  // Polyline points [x0,y0,x1,y1,...] for collision detection
 }
 
 // scoreRoute assigns a quality score to a route (higher is better)
@@ -188,33 +174,28 @@ func scoreRoute(candidate RouteCandidate) int {
 	}
 	isNarrowToWide := candidate.boxWidth1 > 0 && widthDiff > candidate.boxWidth1*2
 
-	// Prefer straight arrows over bent arrows
-	if candidate.strategy == "straight_vertical" {
+	// Base score by strategy type
+	switch candidate.strategy {
+	case "straight_vertical":
 		score += 100
-
-		// Penalize straight vertical if there's a significant width difference
 		if isNarrowToWide {
 			score -= 50
 		}
-	} else if candidate.strategy == "non_overlapping_horizontal" {
+	case "non_overlapping_horizontal":
 		score += 90
-	}
-
-	// Prefer 2-segment over 3-segment
-	if candidate.strategy == "two_segment_vertical_first" {
+	case "two_segment_vertical_first":
 		score += 80
-	} else if candidate.strategy == "two_segment_horizontal_first" {
-		// Give high score for horizontal-first in narrow-to-wide transitions
+	case "two_segment_horizontal_first":
 		if isNarrowToWide {
-			score += 95 // Higher than vertical-first for this case
+			score += 95
 		} else {
-			score += 75 // Otherwise lower priority
+			score += 75
 		}
-	} else if candidate.strategy == "three_segment_horizontal_first" {
+	case "three_segment_horizontal_first", "three_segment_vertical_first":
 		score += 70
 	}
 
-	// Prefer shorter arrows (Manhattan distance)
+	// Distance penalty (Manhattan distance, max 50)
 	dx := candidate.endX - candidate.startX
 	dy := candidate.endY - candidate.startY
 	if dx < 0 {
@@ -224,12 +205,22 @@ func scoreRoute(candidate RouteCandidate) int {
 		dy = -dy
 	}
 	distance := dx + dy
-
-	// Subtract distance penalty (max 50 points penalty for very long arrows)
 	if distance > 500 {
 		score -= 50
 	} else {
 		score -= distance / 10
+	}
+
+	// Flow direction bonuses
+	if candidate.flow == "down" {
+		switch candidate.strategy {
+		case "straight_vertical":
+			score += 30
+		case "three_segment_vertical_first":
+			score += 40
+		case "two_segment_vertical_first":
+			score += 15
+		}
 	}
 
 	return score
@@ -244,12 +235,7 @@ func validateAndAddCandidate(
 	candidates *[]RouteCandidate,
 	allCandidates *[]RouteCandidate,
 ) bool {
-	// Check for illegal coordinates (startX > endX)
-	if candidate.startX > candidate.endX {
-		candidate.rejected = true
-		candidate.rejectReason = "illegal_coordinates"
-	} else if checkTwoSegmentCollision(candidate.startX, candidate.startY, candidate.endX, candidate.endY, candidate.verticalFirst, allBoxes, fromID, toID) {
-		// Check for collision with boxes
+	if checkPathCollision(candidate.segments, allBoxes, fromID, toID) {
 		candidate.rejected = true
 		candidate.rejectReason = "collision_detected"
 	}
@@ -275,6 +261,7 @@ func RouteArrow(
 	fromGridX, fromGridY, toGridX, toGridY int,
 	allBoxes []BoxData,
 	fromID, toID string,
+	flow string,
 ) (*RoutingPlan, error) {
 	var candidates []RouteCandidate
 	allCandidates := make([]RouteCandidate, 0)
@@ -305,7 +292,8 @@ func RouteArrow(
 		candidate := RouteCandidate{
 			startX: sx, startY: sy, endX: ex, endY: ey,
 			strategy: "straight_vertical", verticalFirst: true,
-			boxWidth1: boxWidth1, boxWidth2: boxWidth2,
+			boxWidth1: boxWidth1, boxWidth2: boxWidth2, flow: flow,
+			segments: []int{sx, sy, ex, ey},
 		}
 		validateAndAddCandidate(candidate, allBoxes, fromID, toID, &candidates, &allCandidates)
 	}
@@ -337,7 +325,8 @@ func RouteArrow(
 		candidate := RouteCandidate{
 			startX: sx, startY: sy, endX: ex, endY: ey,
 			strategy: "two_segment_horizontal_first", verticalFirst: false,
-			boxWidth1: boxWidth1, boxWidth2: boxWidth2,
+			boxWidth1: boxWidth1, boxWidth2: boxWidth2, flow: flow,
+			segments: []int{sx, sy, ex, sy, ex, ey},
 		}
 		validateAndAddCandidate(candidate, allBoxes, fromID, toID, &candidates, &allCandidates)
 	}
@@ -371,7 +360,8 @@ func RouteArrow(
 		candidate := RouteCandidate{
 			startX: sx, startY: sy, endX: ex, endY: ey,
 			strategy: "two_segment_vertical_first", verticalFirst: true,
-			boxWidth1: boxWidth1, boxWidth2: boxWidth2,
+			boxWidth1: boxWidth1, boxWidth2: boxWidth2, flow: flow,
+			segments: []int{sx, sy, sx, ey, ex, ey},
 		}
 		validateAndAddCandidate(candidate, allBoxes, fromID, toID, &candidates, &allCandidates)
 	}
@@ -392,10 +382,12 @@ func RouteArrow(
 			ex = box2.X2 + STROKE_ADJUSTMENT
 		}
 
+		midX := (sx + ex) / 2
 		candidate := RouteCandidate{
 			startX: sx, startY: fromCenterY, endX: ex, endY: toCenterY,
 			strategy: "three_segment_horizontal_first", verticalFirst: false,
-			boxWidth1: boxWidth1, boxWidth2: boxWidth2,
+			boxWidth1: boxWidth1, boxWidth2: boxWidth2, flow: flow,
+			segments: []int{sx, fromCenterY, midX, fromCenterY, midX, toCenterY, ex, toCenterY},
 		}
 		validateAndAddCandidate(candidate, allBoxes, fromID, toID, &candidates, &allCandidates)
 	}
@@ -416,10 +408,43 @@ func RouteArrow(
 			ex = box2.X2 + STROKE_ADJUSTMENT
 		}
 
+		// Only generate candidate if there's actual horizontal space between boxes
+		// (boxes don't overlap in the direction of travel)
+		if (toGridX > fromGridX && sx < ex) || (toGridX < fromGridX && sx > ex) {
+			midX := (sx + ex) / 2
+			candidate := RouteCandidate{
+				startX: sx, startY: fromCenterY, endX: ex, endY: toCenterY,
+				strategy: "non_overlapping_horizontal", verticalFirst: false,
+				boxWidth1: boxWidth1, boxWidth2: boxWidth2, flow: flow,
+				segments: []int{sx, fromCenterY, midX, fromCenterY, midX, toCenterY, ex, toCenterY},
+			}
+			validateAndAddCandidate(candidate, allBoxes, fromID, toID, &candidates, &allCandidates)
+		}
+	}
+
+	// Strategy 5: Vertical-first 3-segment routing (vertical, horizontal, vertical)
+	// Only generated when flow == "down" for top-down org chart style arrows
+	if fromGridX != toGridX && fromGridY != toGridY && flow == "down" {
+		fromCenterX := (box1.X1 + box1.X2) / 2
+		toCenterX := (box2.X1 + box2.X2) / 2
+
+		var sy, ey int
+		if toGridY > fromGridY {
+			// Going down: exit bottom, enter top
+			sy = box1.Y2
+			ey = box2.Y1 - STROKE_ADJUSTMENT
+		} else {
+			// Going up: exit top, enter bottom
+			sy = box1.Y1
+			ey = box2.Y2 + STROKE_ADJUSTMENT
+		}
+
+		midY := (sy + ey) / 2
 		candidate := RouteCandidate{
-			startX: sx, startY: fromCenterY, endX: ex, endY: toCenterY,
-			strategy: "non_overlapping_horizontal", verticalFirst: false,
-			boxWidth1: boxWidth1, boxWidth2: boxWidth2,
+			startX: fromCenterX, startY: sy, endX: toCenterX, endY: ey,
+			strategy: "three_segment_vertical_first", verticalFirst: true,
+			boxWidth1: boxWidth1, boxWidth2: boxWidth2, flow: flow,
+			segments: []int{fromCenterX, sy, fromCenterX, midY, toCenterX, midY, toCenterX, ey},
 		}
 		validateAndAddCandidate(candidate, allBoxes, fromID, toID, &candidates, &allCandidates)
 	}
@@ -458,6 +483,7 @@ func RouteArrow(
 		EndY:          best.endY,
 		Strategy:      best.strategy,
 		VerticalFirst: best.verticalFirst,
+		NumSegments:   len(best.segments)/2 - 1,
 		AllCandidates: allCandidates,
 	}, nil
 }

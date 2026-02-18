@@ -118,6 +118,26 @@ Visually group boxes with a surrounding dashed rectangle:
 
 Append `@GroupName` to assign a box to a group. Define `@GroupName: Label` to set a custom label (defaults to the group name).
 
+### Containers
+
+Group elements with relative coordinates using `[...]` brackets. Coordinates inside a container are relative to the container's position. Moving the container moves all its elements.
+
+```
+G: 3,2 [
+    X: 0,0: Alpha
+    +2,0: Beta
+    Y: 0,2: Gamma
+    X -> Y
+]
+```
+
+- `0,0` resolves to the container origin (3,2)
+- `+1,0` is relative to the previous box (works as usual)
+- `4,4` is offset from the container origin (resolves to 7,6)
+- Arrows inside containers work normally (box IDs are global)
+- Containers are purely organizational — no visual border is drawn (use `@Group` for that)
+- Nesting is not supported
+
 ### Arrows
 
 ```

@@ -1,0 +1,11 @@
+---
+arrow-flow: down
+---
+
+CTO: 10,1: CTO
+HE: >-2,+1: Head of Engineering
+HS: +2,0: Head of Security
+TL1: -4,+1: Team Lead 1
+
+CTO -> HS
+HE -> TL1

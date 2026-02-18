@@ -210,7 +210,7 @@ func main() {
 		fmt.Printf("Error creating output file '%s': %v\n", cli.Out, err)
 		os.Exit(1)
 	}
-	defer outFile.Close()
+	defer func() { _ = outFile.Close() }()
 
 	// Read diagram from file
 	diagramBytes, err := os.ReadFile(cli.Diagram)
@@ -257,7 +257,7 @@ func main() {
 	config.VerticalGapUnits = cli.VerticalGap
 
 	// Layout: convert logical spec to concrete diagram with pixel coordinates
-	diagram, boxData := Layout(spec, config, frontmatter.Legend, spec.Groups)
+	diagram, boxData := Layout(spec, config, frontmatter.Legend, spec.Groups, frontmatter.ArrowFlow)
 
 	// Set presentation details
 	diagram.YAxisLabel = frontmatter.YLabel

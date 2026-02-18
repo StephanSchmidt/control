@@ -41,6 +41,7 @@ type BoxSpec struct {
 type ArrowSpec struct {
 	FromID string
 	ToID   string
+	Flow   string // Optional per-arrow flow hint (e.g., "down")
 }
 
 // ParsedCoordinate represents a single parsed coordinate with metadata
@@ -216,11 +217,12 @@ type LegendEntry struct {
 
 // Frontmatter represents metadata parsed from the top of a diagram file
 type Frontmatter struct {
-	Font   string            // Path to custom font file (WOFF2 format)
-	XLabel string            // X-axis label (default: "Time"); empty string = no axis
-	YLabel string            // Y-axis label (default: "Control"); empty string = no axis
-	Legend []LegendEntry     // Legend entries mapping style codes to descriptions
-	Colors map[string]string // Custom color definitions (name -> hex)
+	Font      string            // Path to custom font file (WOFF2 format)
+	XLabel    string            // X-axis label (default: "Time"); empty string = no axis
+	YLabel    string            // Y-axis label (default: "Control"); empty string = no axis
+	Legend    []LegendEntry     // Legend entries mapping style codes to descriptions
+	Colors    map[string]string // Custom color definitions (name -> hex)
+	ArrowFlow string            // Global arrow flow direction (e.g., "down" for top-down routing)
 }
 
 // ParseFrontmatter extracts frontmatter key:value pairs from the top of diagram text.
@@ -325,6 +327,11 @@ func parseFrontmatterKey(fm *Frontmatter, trimmed string) bool {
 		return true
 	}
 
+	if strings.HasPrefix(trimmed, "arrow-flow:") {
+		fm.ArrowFlow = strings.TrimSpace(strings.TrimPrefix(trimmed, "arrow-flow:"))
+		return true
+	}
+
 	if strings.HasPrefix(trimmed, "color:") {
 		value := strings.TrimSpace(strings.TrimPrefix(trimmed, "color:"))
 		parts := strings.SplitN(value, "=", 2)
@@ -358,6 +365,11 @@ func ParseDiagramSpec(text string, customColors map[string]string) (*DiagramSpec
 	groupDefs := make(map[string]string) // Group name -> label (from @Group: Label lines)
 	boxGroups := make(map[string]string) // Box ID -> group name (from @Group suffix on box lines)
 
+	// Container state (purely organizational, no visual rendering)
+	var inContainer bool
+	var containerID string
+	var containerBaseX, containerBaseY int
+
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -367,7 +379,66 @@ func ParseDiagramSpec(text string, customColors map[string]string) (*DiagramSpec
 		if strings.HasPrefix(line, "#") {
 			continue
 		}
+		// Detect container closing "]"
+		if line == "]" {
+			if !inContainer {
+				return nil, fmt.Errorf("unexpected ']' outside container")
+			}
+			// Containers are purely organizational (coordinate grouping).
+			// No GroupDef is created — use @Group for visual borders.
+			inContainer = false
+			containerID = ""
+			continue
+		}
+
+		// Detect container header: line ends with "["
+		if strings.HasSuffix(line, "[") {
+			if inContainer {
+				return nil, fmt.Errorf("nested containers not supported")
+			}
+			if inArrowSection {
+				return nil, fmt.Errorf("container not allowed in arrow section")
+			}
+			// Strip "[" and trim
+			headerStr := strings.TrimSpace(strings.TrimSuffix(line, "["))
+
+			// Parse: "ID: x,y [" or "ID: x,y: Label ["
+			headerParts := strings.SplitN(headerStr, ":", 3)
+			if len(headerParts) < 2 {
+				return nil, fmt.Errorf("invalid container definition: '%s'", line)
+			}
+			containerID = strings.TrimSpace(headerParts[0])
+			coordsStr := strings.TrimSpace(headerParts[1])
+
+			coords := strings.Split(coordsStr, ",")
+			if len(coords) != 2 {
+				return nil, fmt.Errorf("invalid container coordinates: '%s'", line)
+			}
+
+			baseX, err := strconv.Atoi(strings.TrimSpace(coords[0]))
+			if err != nil {
+				return nil, fmt.Errorf("invalid container X coordinate in line: '%s'", line)
+			}
+			baseY, err := strconv.Atoi(strings.TrimSpace(coords[1]))
+			if err != nil {
+				return nil, fmt.Errorf("invalid container Y coordinate in line: '%s'", line)
+			}
+
+			containerBaseX = baseX
+			containerBaseY = baseY
+
+			// Set previous position to container base so relative coords inside work
+			previousGridX = containerBaseX
+			previousGridY = containerBaseY
+
+			inContainer = true
+			continue
+		}
+
 		if line == "---" {
+			if inContainer {
+				return nil, fmt.Errorf("section separator not allowed inside container")
+			}
 			inArrowSection = true
 			continue
 		}
@@ -377,7 +448,17 @@ func ParseDiagramSpec(text string, customColors map[string]string) (*DiagramSpec
 			parts := strings.Split(line, "->")
 			if len(parts) == 2 {
 				from := strings.TrimSpace(parts[0])
-				to := strings.TrimSpace(parts[1])
+				toAndFlow := strings.TrimSpace(parts[1])
+
+				// Parse optional "| flow" suffix (e.g., "HE | down")
+				var to, arrowFlow string
+				if pipeIdx := strings.Index(toAndFlow, "|"); pipeIdx >= 0 {
+					to = strings.TrimSpace(toAndFlow[:pipeIdx])
+					arrowFlow = strings.TrimSpace(toAndFlow[pipeIdx+1:])
+				} else {
+					to = toAndFlow
+				}
+
 				if from != "" && to != "" {
 					// Manual arrows cannot reference internal IDs
 					if strings.HasPrefix(from, "_box_") {
@@ -389,6 +470,7 @@ func ParseDiagramSpec(text string, customColors map[string]string) (*DiagramSpec
 					spec.Arrows = append(spec.Arrows, ArrowSpec{
 						FromID: from,
 						ToID:   to,
+						Flow:   arrowFlow,
 					})
 					continue
 				}
@@ -423,8 +505,8 @@ func ParseDiagramSpec(text string, customColors map[string]string) (*DiagramSpec
 					return nil, fmt.Errorf("invalid box definition: empty ID in line '%s'", line)
 				}
 				for _, ch := range id {
-					if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
-						(ch >= '0' && ch <= '9') || ch == '_' || ch == '-') {
+					if (ch < 'a' || ch > 'z') && (ch < 'A' || ch > 'Z') &&
+						(ch < '0' || ch > '9') && ch != '_' && ch != '-' {
 						return nil, fmt.Errorf("invalid ID '%s': must contain only alphanumeric characters, underscore, or hyphen", id)
 					}
 				}
@@ -534,7 +616,8 @@ func ParseDiagramSpec(text string, customColors map[string]string) (*DiagramSpec
 			}
 
 			// Check if first box tries to use relative coordinates
-			if previousBoxID == "" && (coordX.IsRelative || coordY.IsRelative) {
+			// Inside a container, previousGridX/Y are set to container base, so relative coords are OK
+			if previousBoxID == "" && !inContainer && (coordX.IsRelative || coordY.IsRelative) {
 				idStr := id
 				if idStr == "" {
 					idStr = "(unlabeled)"
@@ -558,16 +641,20 @@ func ParseDiagramSpec(text string, customColors map[string]string) (*DiagramSpec
 				}
 			}
 
-			// Resolve relative coordinates
+			// Resolve coordinates
 			var gridX, gridY int
 			if coordX.IsRelative {
 				gridX = previousGridX + coordX.Value
+			} else if inContainer {
+				gridX = containerBaseX + coordX.Value
 			} else {
 				gridX = coordX.Value
 			}
 
 			if coordY.IsRelative {
 				gridY = previousGridY + coordY.Value
+			} else if inContainer {
+				gridY = containerBaseY + coordY.Value
 			} else {
 				gridY = coordY.Value
 			}
@@ -653,6 +740,11 @@ func ParseDiagramSpec(text string, customColors map[string]string) (*DiagramSpec
 			// In arrow section, non-arrow lines are invalid
 			return nil, fmt.Errorf("invalid arrow definition: '%s'", line)
 		}
+	}
+
+	// Check for unclosed container
+	if inContainer {
+		return nil, fmt.Errorf("unclosed container '%s'", containerID)
 	}
 
 	// Validate that all arrows reference existing boxes
