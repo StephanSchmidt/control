@@ -232,9 +232,9 @@ func Layout(spec *DiagramSpec, config DiagramConfig, legend []LegendEntry, group
 		}
 		diagram.Groups = append(diagram.Groups, Group{
 			X:      minX - groupPadding,
-			Y:      minY - groupPadding - 20, // extra space for label
+			Y:      minY - groupPadding - 30, // extra space for label
 			Width:  (maxX - minX) + 2*groupPadding,
-			Height: (maxY - minY) + 2*groupPadding + 20, // extra space for label
+			Height: (maxY - minY) + 2*groupPadding + 30, // extra space for label
 			Label:  g.Label,
 			BoxIDs: g.BoxIDs,
 		})

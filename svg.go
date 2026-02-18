@@ -109,7 +109,7 @@ func drawGroup(x, y, width, height int, label string, font *FontData) string {
 		x, y, width, height)
 	if label != "" {
 		attrs := map[string]string{}
-		result += drawText(x+10, y+24, label, 24, attrs, font)
+		result += drawText(x+10, y+26, label, 24, attrs, font)
 	}
 	return result
 }
