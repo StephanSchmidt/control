@@ -1,5 +1,6 @@
 ---
 x-label: Time
+y-label: Control
 legend: p=Planning
 legend: lp=Coding
 ---

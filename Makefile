@@ -1,6 +1,6 @@
-.PHONY: all build install test test-coverage lint check sec upgrade-deps example examples tutorial clean
+.PHONY: all build install test test-coverage lint check sec upgrade-deps example examples tutorial clean release
 
-all: lint sec test build
+all: lint sec test build tutorial examples
 
 build: go-imports
 	go build -o bin/control .
@@ -59,3 +59,6 @@ upgrade-deps:
 	go get -u ./...
 	go mod tidy
 	gotestsum ./...
+
+release: all
+	GITHUB_TOKEN=$$(gh auth token) HOMEBREW_CONTROL_TOKEN=$$(gh auth token) goreleaser release --clean
