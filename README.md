@@ -4,6 +4,10 @@ Generate SVG diagrams from plain text. Define boxes on a grid, connect them with
 
 Written for the diagrams in my [Theory of Control of Software Engineering](https://www.tabulamag.com/p/introduction-to-theory-of-control), designed to be embedded into [sli.dev](https://sli.dev) markdown presentations.
 
+### AI-friendly by design
+
+`control` is built to work well with AI coding agents. The plain-text input format is easy for LLMs to generate and modify — no GUI, no binary formats, no complex APIs. The CLI provides comprehensive `--help` output with usage examples, and the `--debug` flag outputs structured JSON for programmatic inspection. Feed an AI agent the format spec, and it can produce and iterate on diagrams autonomously.
+
 ![Scrum workflow example](examples/scrum.svg)
 
 ## Tutorial
