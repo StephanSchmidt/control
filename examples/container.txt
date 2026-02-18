@@ -8,5 +8,5 @@ G: 3,2 [
 ]
 
 B: 8,1: Another Box
-A -> X
-Y -> B
+A -> G.X
+G.Y -> B

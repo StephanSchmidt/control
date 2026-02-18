@@ -1386,27 +1386,27 @@ G: 2,2 [
 	config := NewDefaultConfig()
 	diagram, boxData := Layout(spec, config, nil, spec.Groups, "")
 
-	// Verify boxes exist and have correct grid positions
-	xData, ok := boxData["X"]
+	// Verify boxes exist and have correct grid positions (scoped IDs: G.X, G.Y)
+	xData, ok := boxData["G.X"]
 	if !ok {
-		t.Fatal("Expected box X in boxData")
+		t.Fatal("Expected box G.X in boxData")
 	}
-	yData, ok := boxData["Y"]
+	yData, ok := boxData["G.Y"]
 	if !ok {
-		t.Fatal("Expected box Y in boxData")
+		t.Fatal("Expected box G.Y in boxData")
 	}
 
 	// X at grid (2,2), Y at grid (4,2)
 	if xData.GridX != 2 || xData.GridY != 2 {
-		t.Errorf("Expected X at grid (2,2), got (%d,%d)", xData.GridX, xData.GridY)
+		t.Errorf("Expected G.X at grid (2,2), got (%d,%d)", xData.GridX, xData.GridY)
 	}
 	if yData.GridX != 4 || yData.GridY != 2 {
-		t.Errorf("Expected Y at grid (4,2), got (%d,%d)", yData.GridX, yData.GridY)
+		t.Errorf("Expected G.Y at grid (4,2), got (%d,%d)", yData.GridX, yData.GridY)
 	}
 
 	// Verify pixel positions are different (Y is to the right of X)
 	if yData.PixelX <= xData.PixelX {
-		t.Errorf("Expected Y pixel X > X pixel X, got Y=%d, X=%d", yData.PixelX, xData.PixelX)
+		t.Errorf("Expected G.Y pixel X > G.X pixel X, got Y=%d, X=%d", yData.PixelX, xData.PixelX)
 	}
 
 	// Containers don't create groups — purely organizational

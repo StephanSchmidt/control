@@ -368,6 +368,7 @@ func ParseDiagramSpec(text string, customColors map[string]string) (*DiagramSpec
 	var inContainer bool
 	var containerID string
 	var containerBaseX, containerBaseY int
+	var containerBoxIDs []string
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -378,15 +379,31 @@ func ParseDiagramSpec(text string, customColors map[string]string) (*DiagramSpec
 		if strings.HasPrefix(line, "#") {
 			continue
 		}
-		// Detect container closing "]"
-		if line == "]" {
+		// Detect container closing "]" with optional @GroupName suffix
+		if line == "]" || strings.HasPrefix(line, "] ") {
 			if !inContainer {
 				return nil, fmt.Errorf("unexpected ']' outside container")
 			}
-			// Containers are purely organizational (coordinate grouping).
-			// No GroupDef is created — use @Group for visual borders.
+			// Check for @GroupName suffix on the closing line
+			if suffix := strings.TrimSpace(strings.TrimPrefix(line, "]")); suffix != "" {
+				if !strings.HasPrefix(suffix, "@") {
+					return nil, fmt.Errorf("invalid container closing syntax: '%s' (expected '] @GroupName')", line)
+				}
+				containerGroup := strings.TrimPrefix(suffix, "@")
+				for _, boxID := range containerBoxIDs {
+					boxGroups[boxID] = containerGroup
+					// Update BoxSpec.Group field as well
+					for i := range spec.Boxes {
+						if spec.Boxes[i].ID == boxID {
+							spec.Boxes[i].Group = containerGroup
+							break
+						}
+					}
+				}
+			}
 			inContainer = false
 			containerID = ""
+			containerBoxIDs = nil
 			continue
 		}
 
@@ -448,11 +465,16 @@ func ParseDiagramSpec(text string, customColors map[string]string) (*DiagramSpec
 				}
 
 				if from != "" && to != "" {
+					// Auto-scope arrow IDs inside containers
+					if inContainer {
+						from = containerID + "." + from
+						to = containerID + "." + to
+					}
 					// Manual arrows cannot reference internal IDs
-					if strings.HasPrefix(from, "_box_") {
+					if strings.HasPrefix(from, "_box_") || strings.Contains(from, "._box_") {
 						return nil, fmt.Errorf("arrow '%s -> %s' references box without explicit label (internal ID: %s)", from, to, from)
 					}
-					if strings.HasPrefix(to, "_box_") {
+					if strings.HasPrefix(to, "_box_") || strings.Contains(to, "._box_") {
 						return nil, fmt.Errorf("arrow '%s -> %s' references box without explicit label (internal ID: %s)", from, to, to)
 					}
 					spec.Arrows = append(spec.Arrows, ArrowSpec{
@@ -513,6 +535,11 @@ func ParseDiagramSpec(text string, customColors map[string]string) (*DiagramSpec
 		if id == "" {
 			id = fmt.Sprintf("_box_%d", internalIDCounter)
 			internalIDCounter++
+		}
+
+		// Scope box IDs inside containers: "X" → "G.X"
+		if inContainer {
+			id = containerID + "." + id
 		}
 
 		// Check for auto-arrow prefix ">" or touch-left prefix "|"
@@ -708,6 +735,11 @@ func ParseDiagramSpec(text string, customColors map[string]string) (*DiagramSpec
 			TouchLeft:   touchLeft,
 			Group:       groupName,
 		})
+
+		// Track box IDs inside the current container
+		if inContainer {
+			containerBoxIDs = append(containerBoxIDs, id)
+		}
 
 		// Track box-to-group mapping
 		if groupName != "" {

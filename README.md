@@ -138,7 +138,9 @@ G: 3,2 [
 - `0,0` resolves to the container origin (3,2)
 - `+1,0` is relative to the previous box (works as usual)
 - `4,4` is offset from the container origin (resolves to 7,6)
-- Arrows inside containers work normally (box IDs are global)
+- Box IDs inside containers are scoped: `X` becomes `G.X`
+- Arrows inside containers use local IDs (`X -> Y` auto-scopes to `G.X -> G.Y`)
+- Outside, reference container boxes with `ContainerID.BoxID` (e.g., `A -> G.X`)
 - Containers are purely organizational — no visual border is drawn (use `@Group` for that)
 - Nesting is not supported
 

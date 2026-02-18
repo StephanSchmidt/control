@@ -2871,8 +2871,8 @@ G: 1,1 [
 	}
 
 	// X at 0,0 inside container at 1,1 → grid (1,1)
-	if spec.Boxes[0].ID != "X" {
-		t.Errorf("Expected box 0 ID 'X', got '%s'", spec.Boxes[0].ID)
+	if spec.Boxes[0].ID != "G.X" {
+		t.Errorf("Expected box 0 ID 'G.X', got '%s'", spec.Boxes[0].ID)
 	}
 	if spec.Boxes[0].GridX != 1 || spec.Boxes[0].GridY != 1 {
 		t.Errorf("Expected X at (1,1), got (%d,%d)", spec.Boxes[0].GridX, spec.Boxes[0].GridY)
@@ -2887,19 +2887,19 @@ G: 1,1 [
 	}
 
 	// Y at 4,4 inside container at 1,1 → grid (5,5)
-	if spec.Boxes[2].ID != "Y" {
-		t.Errorf("Expected box 2 ID 'Y', got '%s'", spec.Boxes[2].ID)
+	if spec.Boxes[2].ID != "G.Y" {
+		t.Errorf("Expected box 2 ID 'G.Y', got '%s'", spec.Boxes[2].ID)
 	}
 	if spec.Boxes[2].GridX != 5 || spec.Boxes[2].GridY != 5 {
 		t.Errorf("Expected Y at (5,5), got (%d,%d)", spec.Boxes[2].GridX, spec.Boxes[2].GridY)
 	}
 
-	// Arrow X → Y
+	// Arrow G.X → G.Y (auto-scoped inside container)
 	if len(spec.Arrows) != 1 {
 		t.Fatalf("Expected 1 arrow, got %d", len(spec.Arrows))
 	}
-	if spec.Arrows[0].FromID != "X" || spec.Arrows[0].ToID != "Y" {
-		t.Errorf("Expected arrow X->Y, got %s->%s", spec.Arrows[0].FromID, spec.Arrows[0].ToID)
+	if spec.Arrows[0].FromID != "G.X" || spec.Arrows[0].ToID != "G.Y" {
+		t.Errorf("Expected arrow G.X->G.Y, got %s->%s", spec.Arrows[0].FromID, spec.Arrows[0].ToID)
 	}
 
 	// Containers are purely organizational — no group created
@@ -2987,8 +2987,8 @@ B: 5,5: After
 	}
 
 	// X at 0,0 inside container at 3,3 → grid (3,3)
-	if spec.Boxes[1].ID != "X" || spec.Boxes[1].GridX != 3 || spec.Boxes[1].GridY != 3 {
-		t.Errorf("Expected X at (3,3), got (%d,%d)", spec.Boxes[1].GridX, spec.Boxes[1].GridY)
+	if spec.Boxes[1].ID != "G.X" || spec.Boxes[1].GridX != 3 || spec.Boxes[1].GridY != 3 {
+		t.Errorf("Expected G.X at (3,3), got ID=%s (%d,%d)", spec.Boxes[1].ID, spec.Boxes[1].GridX, spec.Boxes[1].GridY)
 	}
 
 	// B at (5,5) - absolute, outside container
@@ -3008,7 +3008,7 @@ A: 1,1: Outside
 G: 3,3 [
     X: 0,0: Inside
 ]
-A -> X
+A -> G.X
 `
 	spec, err := ParseDiagramSpec(text, nil)
 	if err != nil {
@@ -3018,8 +3018,8 @@ A -> X
 	if len(spec.Arrows) != 1 {
 		t.Fatalf("Expected 1 arrow, got %d", len(spec.Arrows))
 	}
-	if spec.Arrows[0].FromID != "A" || spec.Arrows[0].ToID != "X" {
-		t.Errorf("Expected arrow A->X, got %s->%s", spec.Arrows[0].FromID, spec.Arrows[0].ToID)
+	if spec.Arrows[0].FromID != "A" || spec.Arrows[0].ToID != "G.X" {
+		t.Errorf("Expected arrow A->G.X, got %s->%s", spec.Arrows[0].FromID, spec.Arrows[0].ToID)
 	}
 }
 
@@ -3068,5 +3068,149 @@ G: 1,1 [
 				t.Errorf("Expected error containing %q, got %q", tt.wantErr, err.Error())
 			}
 		})
+	}
+}
+
+// Container @Group tests
+
+func TestParseDiagramSpec_ContainerGroupBasic(t *testing.T) {
+	text := `
+G: 1,1 [
+    A: 0,0: Alice
+    B: 1,0: Bob
+] @Team
+`
+	spec, err := ParseDiagramSpec(text, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if len(spec.Boxes) != 2 {
+		t.Fatalf("Expected 2 boxes, got %d", len(spec.Boxes))
+	}
+
+	// Both boxes should be assigned to group "Team"
+	if spec.Boxes[0].Group != "Team" {
+		t.Errorf("Expected box 0 group 'Team', got '%s'", spec.Boxes[0].Group)
+	}
+	if spec.Boxes[1].Group != "Team" {
+		t.Errorf("Expected box 1 group 'Team', got '%s'", spec.Boxes[1].Group)
+	}
+
+	// One group should be created
+	if len(spec.Groups) != 1 {
+		t.Fatalf("Expected 1 group, got %d", len(spec.Groups))
+	}
+	if spec.Groups[0].Name != "Team" {
+		t.Errorf("Expected group name 'Team', got '%s'", spec.Groups[0].Name)
+	}
+	if spec.Groups[0].Label != "Team" {
+		t.Errorf("Expected group label 'Team', got '%s'", spec.Groups[0].Label)
+	}
+	if len(spec.Groups[0].BoxIDs) != 2 {
+		t.Errorf("Expected 2 box IDs in group, got %d", len(spec.Groups[0].BoxIDs))
+	}
+}
+
+func TestParseDiagramSpec_ContainerGroupWithDefinition(t *testing.T) {
+	text := `
+@Team: Engineering Team
+G: 1,1 [
+    A: 0,0: Alice
+    B: 1,0: Bob
+] @Team
+`
+	spec, err := ParseDiagramSpec(text, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if len(spec.Groups) != 1 {
+		t.Fatalf("Expected 1 group, got %d", len(spec.Groups))
+	}
+	// Label should come from the @Team: definition
+	if spec.Groups[0].Label != "Engineering Team" {
+		t.Errorf("Expected group label 'Engineering Team', got '%s'", spec.Groups[0].Label)
+	}
+}
+
+func TestParseDiagramSpec_ContainerGroupSingleBox(t *testing.T) {
+	text := `
+G: 1,1 [
+    A: 0,0: Alice
+] @Solo
+`
+	spec, err := ParseDiagramSpec(text, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if len(spec.Boxes) != 1 {
+		t.Fatalf("Expected 1 box, got %d", len(spec.Boxes))
+	}
+	if spec.Boxes[0].Group != "Solo" {
+		t.Errorf("Expected box group 'Solo', got '%s'", spec.Boxes[0].Group)
+	}
+	if len(spec.Groups) != 1 {
+		t.Fatalf("Expected 1 group, got %d", len(spec.Groups))
+	}
+	if spec.Groups[0].Name != "Solo" {
+		t.Errorf("Expected group name 'Solo', got '%s'", spec.Groups[0].Name)
+	}
+	if len(spec.Groups[0].BoxIDs) != 1 {
+		t.Errorf("Expected 1 box ID in group, got %d", len(spec.Groups[0].BoxIDs))
+	}
+}
+
+func TestParseDiagramSpec_ContainerGroupOverridesBoxGroup(t *testing.T) {
+	text := `
+G: 1,1 [
+    A: 0,0: Alice @Other
+    B: 1,0: Bob
+] @Team
+`
+	spec, err := ParseDiagramSpec(text, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Container @Group should override the box-level @Other
+	if spec.Boxes[0].Group != "Team" {
+		t.Errorf("Expected box 0 group 'Team' (overridden), got '%s'", spec.Boxes[0].Group)
+	}
+	if spec.Boxes[1].Group != "Team" {
+		t.Errorf("Expected box 1 group 'Team', got '%s'", spec.Boxes[1].Group)
+	}
+
+	// Only one group "Team" should exist (not "Other")
+	if len(spec.Groups) != 1 {
+		t.Fatalf("Expected 1 group, got %d", len(spec.Groups))
+	}
+	if spec.Groups[0].Name != "Team" {
+		t.Errorf("Expected group name 'Team', got '%s'", spec.Groups[0].Name)
+	}
+}
+
+func TestParseDiagramSpec_ContainerPlainClosingNoGroup(t *testing.T) {
+	text := `
+G: 1,1 [
+    A: 0,0: Alice
+    B: 1,0: Bob
+]
+`
+	spec, err := ParseDiagramSpec(text, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// Plain ] — no group assigned
+	if spec.Boxes[0].Group != "" {
+		t.Errorf("Expected no group on box 0, got '%s'", spec.Boxes[0].Group)
+	}
+	if spec.Boxes[1].Group != "" {
+		t.Errorf("Expected no group on box 1, got '%s'", spec.Boxes[1].Group)
+	}
+	if len(spec.Groups) != 0 {
+		t.Errorf("Expected 0 groups, got %d", len(spec.Groups))
 	}
 }

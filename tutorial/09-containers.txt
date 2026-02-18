@@ -8,5 +8,5 @@ G: 3,2 [
 ]
 
 E: 8,1: External
-A -> B
-D -> E
+A -> G.B
+G.D -> E

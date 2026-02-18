@@ -196,7 +196,7 @@ Each group automatically gets a distinct background color and label.
 
 ## 9. Containers
 
-Containers group boxes with a shared coordinate offset. Inner boxes use coordinates relative to the container's base position. Arrows inside the container are defined within the `[ ]` block.
+Containers group boxes with a shared coordinate offset. Inner boxes use coordinates relative to the container's base position. Box IDs inside containers are scoped: `B` inside container `G` becomes `G.B`. Arrows inside the `[ ]` block use local IDs and are auto-scoped.
 
 ```
 A: 1,1: Outside
@@ -209,17 +209,19 @@ G: 3,2 [
 ]
 
 E: 8,1: External
-A -> B
-D -> E
+A -> G.B
+G.D -> E
 ```
 
 | Syntax | Meaning |
 |--------|---------|
 | `G: 3,2 [` | Container at base position 3,2 |
-| `B: 0,0: Alpha` | Box at container-relative 0,0 (actual: 3,2) |
+| `B: 0,0: Alpha` | Box at container-relative 0,0 (actual: 3,2), global ID: `G.B` |
+| `B -> C` | Arrow using local IDs (auto-scoped to `G.B -> G.C`) |
+| `A -> G.B` | Cross-boundary arrow using qualified ID |
 | `]` | End of container |
 
-Arrows between container boxes and outside boxes can appear anywhere.
+Outside the container, reference container boxes with `ContainerID.BoxID` (e.g., `G.B`).
 
 ![Containers](09-containers.svg)
 
