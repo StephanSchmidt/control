@@ -66,8 +66,8 @@ func EstimateLegendWidth(legend []LegendEntry) int {
 		}
 	}
 
-	// Estimate: ~8px per character at font size 14, plus square + gap + padding
-	textWidth := maxLabelLen * 8
+	// Estimate: ~16px per character at legend font size 28, plus square + gap + padding
+	textWidth := maxLabelLen * 16
 	return textWidth + legendSquareSize + legendTextGap + legendPadding*2
 }
 

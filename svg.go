@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
+	"strings"
 )
 
 // svgHeader returns the SVG opening tag with optional embedded font and arrowhead marker definition
@@ -13,9 +14,10 @@ func svgHeader(width, height int, font *FontData) string {
 
 	// Add @font-face only if custom font is provided
 	if font != nil {
+		safeName := sanitizeFontName(font.FontName)
 		header += `<style type="text/css">` +
 			`@font-face {` +
-			`font-family: '` + font.FontName + `';` +
+			`font-family: '` + safeName + `';` +
 			`src: url(data:font/woff2;base64,` + font.Base64Data + `);` +
 			`}` +
 			`</style>`
@@ -34,11 +36,25 @@ func svgFooter() string {
 	return `</svg>`
 }
 
+// sanitizeFontName removes characters that could break CSS font-family declarations
+func sanitizeFontName(name string) string {
+	// Remove characters that could escape CSS string context or inject SVG/XML
+	name = strings.ReplaceAll(name, "'", "")
+	name = strings.ReplaceAll(name, "\"", "")
+	name = strings.ReplaceAll(name, "\\", "")
+	name = strings.ReplaceAll(name, "<", "")
+	name = strings.ReplaceAll(name, ">", "")
+	name = strings.ReplaceAll(name, ";", "")
+	name = strings.ReplaceAll(name, "{", "")
+	name = strings.ReplaceAll(name, "}", "")
+	return name
+}
+
 // getFontFamily returns the font-family CSS value with fallback stack
 func getFontFamily(customFont *FontData) string {
 	fallbacks := `'Arial Narrow', 'Helvetica Neue Condensed', 'Ubuntu Condensed', 'Liberation Sans Narrow', Impact, sans-serif`
 	if customFont != nil {
-		return `'` + customFont.FontName + `', ` + fallbacks
+		return `'` + sanitizeFontName(customFont.FontName) + `', ` + fallbacks
 	}
 	return fallbacks
 }
@@ -93,7 +109,7 @@ func drawGroup(x, y, width, height int, label string, font *FontData) string {
 		x, y, width, height)
 	if label != "" {
 		attrs := map[string]string{}
-		result += drawText(x+10, y+20, label, 24, attrs, font)
+		result += drawText(x+10, y+24, label, 24, attrs, font)
 	}
 	return result
 }

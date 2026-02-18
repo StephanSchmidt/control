@@ -218,8 +218,8 @@ type LegendEntry struct {
 // Frontmatter represents metadata parsed from the top of a diagram file
 type Frontmatter struct {
 	Font      string            // Path to custom font file (WOFF2 format)
-	XLabel    string            // X-axis label (default: "Time"); empty string = no axis
-	YLabel    string            // Y-axis label (default: "Control"); empty string = no axis
+	XLabel    string            // X-axis label; empty string (default) = no axis drawn
+	YLabel    string            // Y-axis label; empty string (default) = no axis drawn
 	Legend    []LegendEntry     // Legend entries mapping style codes to descriptions
 	Colors    map[string]string // Custom color definitions (name -> hex)
 	ArrowFlow string            // Global arrow flow direction (e.g., "down" for top-down routing)

@@ -176,17 +176,24 @@ func (d *Diagram) GenerateSVG() string {
 		svg.WriteString(drawGroup(group.X, group.Y, group.Width, group.Height, group.Label, d.Font))
 	}
 
-	// Draw arrows
+	// Draw arrows based on segment count and routing direction
 	for _, arrow := range d.Arrows {
 		switch {
-		case arrow.FromX == arrow.ToX || arrow.FromY == arrow.ToY:
+		case arrow.NumSegments == 1:
 			svg.WriteString(straightArrow(arrow.FromX, arrow.FromY, arrow.ToX, arrow.ToY))
 		case arrow.NumSegments == 3 && arrow.VerticalFirst:
 			svg.WriteString(twoBentArrowVertical(arrow.FromX, arrow.FromY, arrow.ToX, arrow.ToY))
 		case arrow.NumSegments == 3:
 			svg.WriteString(twoBentArrow(arrow.FromX, arrow.FromY, arrow.ToX, arrow.ToY))
-		default:
+		case arrow.NumSegments == 2:
 			svg.WriteString(oneBentArrow(arrow.FromX, arrow.FromY, arrow.ToX, arrow.ToY, arrow.VerticalFirst))
+		default:
+			// Fallback: use coordinate equality for untyped arrows
+			if arrow.FromX == arrow.ToX || arrow.FromY == arrow.ToY {
+				svg.WriteString(straightArrow(arrow.FromX, arrow.FromY, arrow.ToX, arrow.ToY))
+			} else {
+				svg.WriteString(oneBentArrow(arrow.FromX, arrow.FromY, arrow.ToX, arrow.ToY, arrow.VerticalFirst))
+			}
 		}
 	}
 

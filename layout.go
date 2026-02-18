@@ -70,6 +70,7 @@ func Layout(spec *DiagramSpec, config DiagramConfig, legend []LegendEntry, group
 	boxData := make(map[string]BoxData)
 
 	// Create boxes
+	var previousBoxSpecID string // Track previous box ID for touch-left boxData updates
 	for _, boxSpec := range spec.Boxes {
 		// Convert grid coordinates to pixel coordinates
 		pixelX := gridToPixelX(boxSpec.GridX, dims, config)
@@ -85,10 +86,17 @@ func Layout(spec *DiagramSpec, config DiagramConfig, legend []LegendEntry, group
 			boxWidth += touchExtension // Extend current box to the left
 			pixelX -= touchExtension   // Shift position left by extension amount
 
-			// Extend previous box to the right
+			// Extend previous box to the right (both diagram and boxData)
 			if len(diagram.Boxes) > 0 {
 				prevIdx := len(diagram.Boxes) - 1
 				diagram.Boxes[prevIdx].Width += touchExtension
+
+				// Update boxData for accurate arrow routing/collision detection
+				if prev, ok := boxData[previousBoxSpecID]; ok {
+					prev.Width += touchExtension
+					prev.CenterX = prev.PixelX + prev.Width/2
+					boxData[previousBoxSpecID] = prev
+				}
 			}
 		}
 
@@ -124,6 +132,16 @@ func Layout(spec *DiagramSpec, config DiagramConfig, legend []LegendEntry, group
 			CenterY: pixelY + boxHeight/2,
 			Width:   boxWidth,
 			Height:  boxHeight,
+		}
+
+		previousBoxSpecID = boxSpec.ID
+	}
+
+	// Extend diagram width if any box (with custom GridWidth) exceeds it
+	for _, bd := range boxData {
+		rightEdge := bd.PixelX + bd.Width + 20 // 20px right margin
+		if rightEdge+legendWidth > diagram.Width {
+			diagram.Width = rightEdge + legendWidth
 		}
 	}
 
